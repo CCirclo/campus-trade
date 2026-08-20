@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+archive=${1:?release archive is required}
+release_id=${2:?release id is required}
+app_root=/srv/campus-market
+release_dir="$app_root/releases/$release_id"
+current_link="$app_root/current"
+previous_target=$(readlink -f "$current_link" 2>/dev/null || true)
+
+[[ $release_id =~ ^[0-9a-f]{40}$ ]] || { echo "invalid release id" >&2; exit 2; }
+[[ -f $archive ]] || { echo "release archive not found" >&2; exit 2; }
+tar -tzf "$archive" | awk '/^\// || /(^|\/)\.\.($|\/)/ { bad=1 } END { exit bad }'
+
+install -d -o campus-market -g campus-market "$app_root/releases"
+rm -rf "$release_dir"
+install -d -o campus-market -g campus-market "$release_dir"
+tar -xzf "$archive" -C "$release_dir"
+chown -R campus-market:campus-market "$release_dir"
+ln -sfn "$release_dir" "$current_link.new"
+mv -Tf "$current_link.new" "$current_link"
+systemctl restart campus-market-web.service
+
+if ! curl -fsS --max-time 15 http://127.0.0.1:8787/api/health >/dev/null; then
+  if [[ -n $previous_target && -d $previous_target ]]; then
+    ln -sfn "$previous_target" "$current_link.new"
+    mv -Tf "$current_link.new" "$current_link"
+    systemctl restart campus-market-web.service
+  fi
+  echo "health check failed; previous release restored" >&2
+  exit 1
+fi
+
+rm -f "$archive"
+find "$app_root/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
+  | sort -nr | tail -n +6 | cut -d' ' -f2- | xargs -r rm -rf

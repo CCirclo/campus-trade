@@ -1,13 +1,13 @@
 {
-  "name": "campus-market-web",
+  "name": "campus-market",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n api,web -c blue,green \"tsx watch ../backend/server/bootstrap.ts\" \"vite\"",
-    "start": "tsx ../backend/server/bootstrap.ts",
-    "build": "tsc --noEmit && vite build",
-    "test": "node --import tsx --test ../backend/test/*.test.ts"
+    "dev": "concurrently -k -n api,web -c blue,green \"tsx watch backend/server/bootstrap.ts\" \"vite frontend --config frontend/vite.config.ts\"",
+    "start": "tsx backend/server/bootstrap.ts",
+    "build": "tsc -p frontend/tsconfig.json --noEmit && vite build frontend --config frontend/vite.config.ts",
+    "test": "node --import tsx --test backend/test/*.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

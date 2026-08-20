@@ -5,11 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=www
-Group=www
-WorkingDirectory=/www/wwwroot/campus-market-web
+User=campus-market
+Group=campus-market
+WorkingDirectory=/srv/campus-market/current
 EnvironmentFile=/etc/campus-market/.env
-ExecStart=/usr/local/bin/npm start
+ExecStart=/usr/bin/npm start
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=15

@@ -82,7 +82,7 @@ app.post('/api/me/avatar',requireAuth,avatarUpload.single('avatar'),asyncRoute(a
 app.get('/api/media/:token',asyncRoute(async(req,res)=>{const key=decodeObjectKey(String(req.params.token));if(!key)return res.status(404).end();res.setHeader('Cache-Control','private, max-age=600');res.redirect(await signedObjectUrl(key))}));
 
 app.get('/api/health',asyncRoute(async(_req,res)=>{await pool.query('SELECT 1');res.json({ok:true})}));
-const dist=resolve(process.cwd(),'dist');if(existsSync(dist)){app.use(express.static(dist));app.use((req:Request,res:Response,next)=>{if(req.method!=='GET'||req.path.startsWith('/api/'))return next();res.sendFile(join(dist,'index.html'),error=>{if(error)next(error)})})}
+const dist=resolve(process.cwd(),'frontend','dist');if(existsSync(dist)){app.use(express.static(dist));app.use((req:Request,res:Response,next)=>{if(req.method!=='GET'||req.path.startsWith('/api/'))return next();res.sendFile(join(dist,'index.html'),error=>{if(error)next(error)})})}
 app.use((error:unknown,req:Request,res:Response,_next:NextFunction)=>{console.error(error);const message=error instanceof multer.MulterError?(error.code==='LIMIT_FILE_SIZE'?(req.path==='/api/me/avatar'?'头像图片不能超过 2MB':'单张图片不能超过 5MB'):'图片上传失败'):'服务器暂时无法处理请求';res.status(500).json({error:message})});
 
 initDatabase().then(()=>app.listen(port,host,()=>console.log(`Campus Market listening on http://${host}:${port}`))).catch(error=>{console.error('MySQL initialization failed:',error);process.exitCode=1});

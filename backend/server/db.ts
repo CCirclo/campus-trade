@@ -159,11 +159,11 @@ export async function initDatabase() {
       INDEX idx_reports_item (item_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   ];
-  await migrateAdminColumns();
-  await promoteAdminsFromEnv();
-  if(!await columnExists('email_codes','purpose'))await pool.query(`ALTER TABLE email_codes ADD COLUMN purpose VARCHAR(20) NOT NULL DEFAULT 'register' AFTER attempts`);
   for (const statement of statements) await pool.query(statement);
+  await migrateAdminColumns();
+  if(!await columnExists('email_codes','purpose'))await pool.query(`ALTER TABLE email_codes ADD COLUMN purpose VARCHAR(20) NOT NULL DEFAULT 'register' AFTER attempts`);
   await migrateConversations();
+  await promoteAdminsFromEnv();
   if (process.env.SEED_DEMO_DATA === 'true') await seedDemoData();
 }
 
