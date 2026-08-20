@@ -1,16 +1,26 @@
-# app-ios — iOS 客户端（预留）
+# 校园闲置 iOS
 
-> ⏳ **预留位置**：本目录为 iOS 客户端预留，目前尚未开始开发。
+原生 SwiftUI 客户端，支持 iOS 17 及以上。已覆盖商品浏览、搜索与筛选、商品详情、登录注册、发布与图片上传、收藏评论、站内聊天、个人中心、安全指南和问题反馈。
 
-## 规划
+## 在 Xcode 中运行
 
-- 技术栈：Swift / SwiftUI
-- 功能：商品浏览、搜索分类、发布编辑、收藏评论、站内聊天、个人中心、安全指南等（对齐 Web 端）
-- 后端接口：对齐 [`docs/api.md`](../docs/api.md)
+1. 确认生产后端 `https://20250821cdcdifc.top/campus-trade/api/health` 可访问。
+2. 用 Xcode 打开 `CampusMarket.xcodeproj`。
+3. 选择 `CampusMarket` scheme 和任意 iPhone 模拟器，点击 Run。
 
-## 待办
+模拟器和真机默认连接生产后端 `https://20250821cdcdifc.top/campus-trade`。如需连接本地后端进行开发，可临时在 `CampusMarket/Info.plist` 中修改 `API_BASE_URL`；使用 HTTP 时还需添加仅限开发地址的 ATS 例外。
 
-- [ ] 初始化 Xcode 工程
-- [ ] 实现商品列表 / 详情
-- [ ] 实现发布 / 编辑
-- [ ] 实现站内聊天
+首次真机构建还需要在 Xcode 的 Signing & Capabilities 中选择你的开发团队；Bundle Identifier 默认为 `com.campusmarket.ios`。
+
+## 命令行构建
+
+```bash
+xcodebuild -project CampusMarket.xcodeproj \
+  -scheme CampusMarket \
+  -sdk iphonesimulator \
+  -configuration Debug \
+  -derivedDataPath .derived-data \
+  CODE_SIGNING_ALLOWED=NO build
+```
+
+API 定义见 [`../docs/api.md`](../docs/api.md)。当前 iOS 版未包含 Web 管理后台和商品编辑入口。
