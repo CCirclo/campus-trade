@@ -6,7 +6,10 @@ release_id=${2:?release id is required}
 app_root=/srv/campus-market
 release_dir="$app_root/releases/$release_id"
 current_link="$app_root/current"
-previous_target=$(readlink -f "$current_link" 2>/dev/null || true)
+previous_target=
+if [[ -L $current_link ]]; then
+  previous_target=$(readlink -f "$current_link" 2>/dev/null || true)
+fi
 
 [[ $release_id =~ ^[0-9a-f]{40}$ ]] || { echo "invalid release id" >&2; exit 2; }
 [[ -f $archive ]] || { echo "release archive not found" >&2; exit 2; }
@@ -17,12 +20,12 @@ rm -rf "$release_dir"
 install -d -o campus-market -g campus-market "$release_dir"
 tar -xzf "$archive" -C "$release_dir"
 chown -R campus-market:campus-market "$release_dir"
-runuser -u campus-market -- npm ci --omit=dev --registry=https://registry.npmmirror.com --no-audit --no-fund --prefix "$release_dir"
+runuser -u campus-market -- npm ci --registry=https://registry.npmmirror.com --no-audit --no-fund --prefix "$release_dir"
 ln -sfn "$release_dir" "$current_link.new"
 mv -Tf "$current_link.new" "$current_link"
 systemctl restart campus-market-web.service
 
-if ! curl -fsS --max-time 15 http://127.0.0.1:8787/api/health >/dev/null; then
+if ! curl -fsS --retry 15 --retry-connrefused --retry-delay 1 --max-time 3 http://127.0.0.1:8787/api/health >/dev/null; then
   if [[ -n $previous_target && -d $previous_target ]]; then
     ln -sfn "$previous_target" "$current_link.new"
     mv -Tf "$current_link.new" "$current_link"
