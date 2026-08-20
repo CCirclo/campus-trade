@@ -1,0 +1,20 @@
+# 依赖与构建产物
+node_modules/
+dist/
+uploads/*
+!uploads/.gitkeep
+
+# 环境变量与密钥（.env.example 除外）
+.env
+.env.local
+.env.*.local
+
+# 日志
+npm-debug.log*
+*.log
+
+# 压缩包
+*.tar.gz
+
+# 系统文件
+.DS_Store

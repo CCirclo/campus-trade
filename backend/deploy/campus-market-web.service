@@ -1,0 +1,22 @@
+[Unit]
+Description=Campus Market Web
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www
+Group=www
+WorkingDirectory=/www/wwwroot/campus-market-web
+EnvironmentFile=/etc/campus-market/.env
+ExecStart=/usr/local/bin/npm start
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

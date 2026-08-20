@@ -1,0 +1,17 @@
+import {useEffect,useRef,useState,type PointerEvent as ReactPointerEvent} from 'react';
+import {Check,X} from 'lucide-react';
+import {avatarCropGeometry,clampCropOffset} from './avatar-crop';
+
+const viewport=280;
+const canvasBlob=(canvas:HTMLCanvasElement,quality:number)=>new Promise<Blob>((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('头像处理失败')),'image/jpeg',quality));
+
+export function AvatarCropper({file,onCancel,onDone}:{file:File;onCancel:()=>void;onDone:(file:File)=>void}){
+  const [src,setSrc]=useState(''),[size,setSize]=useState({width:1,height:1}),[zoom,setZoom]=useState(1),[offset,setOffset]=useState({x:0,y:0}),[busy,setBusy]=useState(false);const drag=useRef<{x:number;y:number;originX:number;originY:number}|null>(null),imageRef=useRef<HTMLImageElement>(null);
+  useEffect(()=>{const url=URL.createObjectURL(file);setSrc(url);return()=>URL.revokeObjectURL(url)},[file]);
+  const clamp=(x:number,y:number,nextZoom=zoom)=>clampCropOffset(size.width,size.height,viewport,nextZoom,x,y);
+  const pointerDown=(event:ReactPointerEvent)=>{event.currentTarget.setPointerCapture(event.pointerId);drag.current={x:event.clientX,y:event.clientY,originX:offset.x,originY:offset.y}};
+  const pointerMove=(event:ReactPointerEvent)=>{if(!drag.current)return;setOffset(clamp(drag.current.originX+event.clientX-drag.current.x,drag.current.originY+event.clientY-drag.current.y))};
+  const finish=async()=>{const image=imageRef.current;if(!image)return;setBusy(true);try{const geometry=avatarCropGeometry(size.width,size.height,viewport,zoom,offset.x,offset.y);let outputSize=512,quality=.88,blob:Blob;do{const canvas=document.createElement('canvas');canvas.width=outputSize;canvas.height=outputSize;const context=canvas.getContext('2d');if(!context)throw new Error('头像处理失败');context.fillStyle='#fff';context.fillRect(0,0,outputSize,outputSize);context.drawImage(image,geometry.sourceX,geometry.sourceY,geometry.sourceSize,geometry.sourceSize,0,0,outputSize,outputSize);blob=await canvasBlob(canvas,quality);if(blob.size<=2*1024*1024)break;quality-=.12;outputSize=Math.max(320,Math.round(outputSize*.82))}while(outputSize>320||quality>.5);onDone(new File([blob!],'avatar.jpg',{type:'image/jpeg'}))}finally{setBusy(false)}};
+  const scale=Math.max(viewport/size.width,viewport/size.height)*zoom;
+  return <div className="crop-backdrop" role="dialog" aria-modal="true" aria-label="裁切头像"><div className="crop-modal"><div className="crop-head"><div><b>裁切头像</b><small>拖动图片调整位置</small></div><button type="button" onClick={onCancel} aria-label="关闭"><X/></button></div><div className="crop-viewport" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={()=>drag.current=null}><img ref={imageRef} src={src} alt="待裁切头像" draggable={false} onLoad={e=>setSize({width:e.currentTarget.naturalWidth,height:e.currentTarget.naturalHeight})} style={{width:size.width*scale,height:size.height*scale,transform:`translate(calc(-50% + ${offset.x}px),calc(-50% + ${offset.y}px))`}}/></div><label className="crop-zoom">缩放<input type="range" min="1" max="3" step="0.01" value={zoom} onChange={e=>{const next=Number(e.target.value);setZoom(next);setOffset(clamp(offset.x,offset.y,next))}}/></label><div className="crop-actions"><button type="button" className="button secondary" onClick={onCancel}>取消</button><button type="button" className="button primary" onClick={()=>void finish()} disabled={busy}><Check/>{busy?'处理中…':'使用此头像'}</button></div></div></div>;
+}
