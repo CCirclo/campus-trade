@@ -17,6 +17,7 @@ rm -rf "$release_dir"
 install -d -o campus-market -g campus-market "$release_dir"
 tar -xzf "$archive" -C "$release_dir"
 chown -R campus-market:campus-market "$release_dir"
+runuser -u campus-market -- npm ci --omit=dev --registry=https://registry.npmmirror.com --no-audit --no-fund --prefix "$release_dir"
 ln -sfn "$release_dir" "$current_link.new"
 mv -Tf "$current_link.new" "$current_link"
 systemctl restart campus-market-web.service

@@ -7,7 +7,7 @@ on:
 
 concurrency:
   group: campus-market-production
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -15,7 +15,7 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       VITE_BASE_PATH: /campus-trade/
     steps:
@@ -30,7 +30,7 @@ jobs:
       - name: Create release package
         run: |
           tar -czf campus-market-${GITHUB_SHA}.tar.gz \
-            package.json package-lock.json node_modules backend frontend/dist
+            package.json package-lock.json backend frontend/dist
       - name: Configure SSH
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
