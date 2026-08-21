@@ -18,7 +18,8 @@ if (existing) {
 }
 
 const rl = createInterface({ input, output, terminal: true });
-const muted = rl as unknown as { _writeToOutput: (str: string) => void; outputMuted: boolean };
+// 运行时对象就是 readline.Interface（带 output），此处仅补全类型。
+const muted = rl as unknown as { _writeToOutput: (str: string) => void; outputMuted: boolean; output: typeof output };
 muted._writeToOutput = function (str: string) {
   if (muted.outputMuted) this.output.write('*');
   else this.output.write(str);

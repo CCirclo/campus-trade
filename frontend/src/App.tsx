@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, BookOpen, CheckCircle2, ChevronRight, CircleUserRound, Edit3, Heart, Home,
+  ArrowLeft, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, CircleUserRound, Edit3, Heart, Home,
   ImagePlus, Laptop, LifeBuoy, LogOut, Menu, MessageCircle, Package, Plus, Search,
   Send, ShieldCheck, ShoppingBag, SlidersHorizontal, Sparkles, Upload, UserRound, X,
 } from 'lucide-react';
@@ -66,19 +66,48 @@ function ItemCard({item}:{item:Item}){
 }
 
 function HomePage(){
-  const [params,setParams]=useSearchParams(); const [items,setItems]=useState<Item[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState('');
-  const keyword=params.get('keyword')||''; const category=params.get('category')||''; const sort=params.get('sort')||'latest'; const [search,setSearch]=useState(keyword);
-  const load=()=>{setLoading(true);setError('');const q=new URLSearchParams({schoolId:'ruc_suzhou',sort});if(keyword)q.set('keyword',keyword);if(category)q.set('category',category);api<{items:Item[]}>(`/api/items?${q}`).then(d=>setItems(d.items)).catch(e=>setError(e.message)).finally(()=>setLoading(false));};
-  useEffect(load,[keyword,category,sort]);
-  const submit=(e:FormEvent)=>{e.preventDefault();const next=new URLSearchParams(params); search.trim()?next.set('keyword',search.trim()):next.delete('keyword');setParams(next)};
+  const [params,setParams]=useSearchParams();
+  const [items,setItems]=useState<Item[]>([]);
+  const [total,setTotal]=useState(0);
+  const [pageSize,setPageSize]=useState(20);
+  const [hasMore,setHasMore]=useState(false);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState('');
+  const [attempt,setAttempt]=useState(0);
+  const keyword=params.get('keyword')||''; const category=params.get('category')||''; const sort=params.get('sort')||'latest';
+  const page=Math.max(1,Number.parseInt(params.get('page')||'1',10)||1);
+  const [search,setSearch]=useState(keyword);
+  useEffect(()=>setSearch(keyword),[keyword]);
+  useEffect(()=>{
+    const controller=new AbortController();
+    setLoading(true);setError('');
+    const q=new URLSearchParams({schoolId:'ruc_suzhou',sort,page:String(page)});
+    if(keyword)q.set('keyword',keyword);
+    if(category)q.set('category',category);
+    api<{items:Item[];total:number;page:number;pageSize:number;hasMore:boolean}>(`/api/items?${q}`,{signal:controller.signal})
+      .then(d=>{setItems(d.items);setTotal(d.total);setPageSize(d.pageSize);setHasMore(d.hasMore)})
+      .catch(e=>{if(controller.signal.aborted)return;setError(e instanceof Error?e.message:'加载失败')})
+      .finally(()=>{if(!controller.signal.aborted)setLoading(false)});
+    return ()=>controller.abort();
+  },[keyword,category,sort,page,attempt]);
+  const submit=(e:FormEvent)=>{e.preventDefault();const next=new URLSearchParams(params);search.trim()?next.set('keyword',search.trim()):next.delete('keyword');next.delete('page');setParams(next)};
+  const chooseCategory=(name:string)=>{const n=new URLSearchParams(params);category===name?n.delete('category'):n.set('category',name);n.delete('page');setParams(n)};
+  const changeSort=(value:string)=>{const n=new URLSearchParams(params);n.set('sort',value);n.delete('page');setParams(n)};
+  const gotoPage=(p:number)=>{if(p<1)return;const n=new URLSearchParams(params);n.set('page',String(p));setParams(n)};
+  const lastPage=Math.max(1,Math.ceil(total/pageSize));
   return <>
     <section className="hero"><div className="hero-inner"><div><span className="eyebrow">RUC SUZHOU MARKET</span><h1>让闲置，在校园里<br/><em>继续被喜欢。</em></h1><p>只看同校真实好物，聊好细节，再当面交易。</p></div><div className="hero-art" aria-hidden="true"><div className="art-card one"><BookOpen/><span>教材笔记</span><b>¥28</b></div><div className="art-card two"><Laptop/><span>数码好物</span><b>¥168</b></div><span className="art-orbit">同校<br/>面交</span></div></div></section>
     <section className="market-container">
-      <form className="search-bar" onSubmit={submit}><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="搜索教材、数码或宿舍好物" aria-label="搜索商品"/><button>搜索</button></form>
-      <div className="category-strip">{categories.map(({name,icon:Icon,tone})=><button key={name} className={`category-button ${category===name?'active':''}`} onClick={()=>{const n=new URLSearchParams(params);category===name?n.delete('category'):n.set('category',name);setParams(n)}}><span className={tone}><Icon/></span>{name}</button>)}</div>
+      <form className="search-bar" onSubmit={submit}><Search/><input value={search} onChange={e=>setSearch(e.target.value)} maxLength={40} placeholder="搜索教材、数码或宿舍好物" aria-label="搜索商品"/><button>搜索</button></form>
+      <div className="category-strip">{categories.map(({name,icon:Icon,tone})=><button key={name} className={`category-button ${category===name?'active':''}`} onClick={()=>chooseCategory(name)}><span className={tone}><Icon/></span>{name}</button>)}</div>
       <Link className="safety-banner" to="/safety"><ShieldCheck/><span><b>校内限定 · 当面验货再交易</b><small>不提前支付押金，不点击陌生付款链接</small></span><ChevronRight/></Link>
-      <div className="section-head"><div><span className="eyebrow">JUST IN</span><h2>{keyword?`“${keyword}”的搜索结果`:category||'本校好物'}</h2><p>{schoolName}同学正在转让</p></div><label className="sort-select"><SlidersHorizontal/><select value={sort} onChange={e=>{const n=new URLSearchParams(params);n.set('sort',e.target.value);setParams(n)}}><option value="latest">最新发布</option><option value="priceAsc">价格从低到高</option><option value="priceDesc">价格从高到低</option></select></label></div>
-      {loading?<div className="item-grid skeleton-grid">{[1,2,3,4].map(n=><div key={n} className="skeleton-card"/>)}</div>:error?<ErrorState message={error} retry={load}/>:items.length?<div className="item-grid">{items.map(i=><ItemCard key={i.id} item={i}/>)}</div>:<div className="empty-state"><span className="empty-icon">空</span><h2>这里还很安静</h2><p>换个关键词，或者成为第一个发布的人。</p><Link className="button primary" to="/publish">去发布</Link></div>}
+      <div className="section-head"><div><span className="eyebrow">JUST IN</span><h2>{keyword?`“${keyword}”的搜索结果`:category||'本校好物'}</h2><p>{keyword||category?`共找到 ${total} 件相关好物`:`${schoolName}同学正在转让 · 共 ${total} 件`}</p></div><label className="sort-select"><SlidersHorizontal/><select value={sort} onChange={e=>changeSort(e.target.value)}><option value="latest">最新发布</option><option value="priceAsc">价格从低到高</option><option value="priceDesc">价格从高到低</option></select></label></div>
+      {loading?<div className="item-grid skeleton-grid">{[1,2,3,4].map(n=><div key={n} className="skeleton-card"/>)}</div>:error?<ErrorState message={error} retry={()=>setAttempt(a=>a+1)}/>:items.length?<div className="item-grid">{items.map(i=><ItemCard key={i.id} item={i}/>)}</div>:<div className="empty-state"><span className="empty-icon">空</span><h2>这里还很安静</h2><p>换个关键词，或者返回上一页看看。</p><Link className="button primary" to="/publish">去发布</Link></div>}
+      {!loading&&!error&&total>0&&<nav className="pagination" aria-label="分页导航">
+        <button className="pagination-button" type="button" disabled={page<=1} onClick={()=>gotoPage(page-1)}><ChevronLeft/>上一页</button>
+        <span className="pagination-info">第 {page} / {lastPage} 页 · 共 {total} 件</span>
+        <button className="pagination-button" type="button" disabled={!hasMore} onClick={()=>gotoPage(page+1)}>下一页<ChevronRight/></button>
+      </nav>}
     </section>
   </>;
 }

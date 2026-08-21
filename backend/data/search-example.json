@@ -1,0 +1,24 @@
+{
+  "dataset": "example",
+  "production": false,
+  "description": "内置示例数据集：手工构造的少量标注，仅用于验证评估脚本与指标计算流程，不代表线上数据，也不反映真实线上效果。",
+  "items": [
+    { "id": 1, "title": "高等数学教材第七版", "category": "教材", "description": "同济版高等数学，上下册，笔记少量" },
+    { "id": 2, "title": "高数辅导讲义", "category": "教材", "description": "考研数学辅导讲义，含习题解析" },
+    { "id": 3, "title": "iPhone 15 手机壳 全新", "category": "生活用品", "description": "全新未拆封，适配 iPhone 15" },
+    { "id": 4, "title": "iPhone 14 手机壳", "category": "生活用品", "description": "二手手机壳，iPhone 14 使用" },
+    { "id": 5, "title": "MacBook Air M2 二手", "category": "电子产品", "description": "M2 芯片 8G+256G，电池健康 92%" },
+    { "id": 6, "title": "MacBook Pro M2 Pro", "category": "电子产品", "description": "14 英寸，M2 Pro 芯片，16G 内存" },
+    { "id": 7, "title": "大学物理实验报告册", "category": "教材", "description": "物理实验报告册，几乎全新" },
+    { "id": 8, "title": "计算机组成原理教材", "category": "教材", "description": "计组教材，附课后答案" }
+  ],
+  "queries": [
+    { "query": "高数", "relevant": [1, 2] },
+    { "query": "iphone 15", "relevant": [3] },
+    { "query": "m2", "relevant": [5, 6] },
+    { "query": "大物", "relevant": [7] },
+    { "query": "计组", "relevant": [8] },
+    { "query": "手机壳", "relevant": [3, 4] },
+    { "query": "键盘", "relevant": [] }
+  ]
+}
