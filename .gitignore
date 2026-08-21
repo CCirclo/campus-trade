@@ -18,3 +18,13 @@ npm-debug.log*
 
 # 系统文件
 .DS_Store
+
+# Android
+.gradle/
+build/
+local.properties
+.idea/
+.kotlin/
+.proxyai/
+*.apk
+*.aab

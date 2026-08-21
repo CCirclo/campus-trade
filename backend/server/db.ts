@@ -158,6 +158,26 @@ export async function initDatabase() {
       INDEX idx_reports_status_created (status,created_at),
       INDEX idx_reports_item (item_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS wallets (
+      user_id BIGINT UNSIGNED NOT NULL,
+      currency VARCHAR(20) NOT NULL,
+      balance BIGINT UNSIGNED NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, currency),
+      CONSTRAINT fk_wallets_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS currency_ledger (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      user_id BIGINT UNSIGNED NOT NULL,
+      currency VARCHAR(20) NOT NULL,
+      amount BIGINT UNSIGNED NOT NULL,
+      balance_after BIGINT UNSIGNED NOT NULL,
+      reason VARCHAR(200) NOT NULL,
+      operator VARCHAR(160) NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_currency_ledger_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      INDEX idx_currency_ledger_user (user_id, currency, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   ];
   for (const statement of statements) await pool.query(statement);
   await migrateAdminColumns();
@@ -239,4 +259,4 @@ export function mapItem(row: Record<string, unknown>) {
   };
 }
 
-function dateIso(value:unknown){const date=value instanceof Date?value:new Date(String(value||''));return Number.isNaN(date.getTime())?'':date.toISOString();}
+export function dateIso(value:unknown){const date=value instanceof Date?value:new Date(String(value||''));return Number.isNaN(date.getTime())?'':date.toISOString();}

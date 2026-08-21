@@ -6,8 +6,9 @@ import {join,resolve} from 'node:path';
 import {authRouter} from './auth-routes.js';
 import {adminRouter,requireAdmin} from './admin.js';
 import {optionalAuth,requireAuth,requireCampus,type AuthedRequest} from './auth.js';
-import {all,initDatabase,mapItem,one,pool,publicUser,run} from './db.js';
+import {all,initDatabase,mapItem,one,pool,publicUser,run,dateIso} from './db.js';
 import {categories,cleanText,conditions,consumeRateLimit,isAllowedOrigin,statuses,validPrice} from './security.js';
+import {CURRENCY_LIST} from './currency.js';
 import {cosConfigured,decodeObjectKey,signedObjectUrl,uploadToCos,validImageSignature} from './storage.js';
 import {canonicalPair,itemCardSnapshot,shouldSendItemCard} from './conversations.js';
 import {mailConfigured,sendAdminCommentNotification,sendAdminFeedbackNotification,sendNewMessageNotification} from './mail.js';
@@ -61,6 +62,7 @@ app.post('/api/reports',requireAuth,requireCampus,asyncRoute(async(req,res)=>{if
 app.get('/api/me/items',requireAuth,asyncRoute(async(req,res)=>{const rows=await all(`${itemSelect} WHERE i.user_id=? ORDER BY i.created_at DESC`,[req.user!.id]);res.json({items:rows.map(mapItem)})}));
 app.get('/api/me/favorites',requireAuth,asyncRoute(async(req,res)=>{const rows=await all(`${itemSelect} JOIN favorites f ON f.item_id=i.id WHERE f.user_id=? ORDER BY f.created_at DESC`,[req.user!.id]);res.json({items:rows.map(mapItem)})}));
 app.get('/api/me/stats',requireAuth,asyncRoute(async(req,res)=>{const s=await one(`SELECT COUNT(*) total,SUM(status='在售') selling,SUM(status='已售出') sold FROM items WHERE user_id=?`,[req.user!.id]);res.json({stats:{total:Number(s?.total||0),selling:Number(s?.selling||0),sold:Number(s?.sold||0)}})}));
+app.get('/api/me/wallet',requireAuth,asyncRoute(async(req,res)=>{const balances=await all('SELECT currency,balance FROM wallets WHERE user_id=?',[req.user!.id]);const wallet:Record<string,{code:string;name:string;description:string;balance:number}>=Object.fromEntries(CURRENCY_LIST.map(c=>[c.code,{code:c.code,name:c.name,description:c.description,balance:0}]));for(const row of balances){const code=String(row.currency);if(wallet[code])wallet[code].balance=Number(row.balance)}const entries=await all('SELECT id,currency,amount,balance_after,reason,operator,created_at FROM currency_ledger WHERE user_id=? ORDER BY id DESC LIMIT 50',[req.user!.id]);res.json({wallet,entries:entries.map(e=>({id:Number(e.id),currency:String(e.currency),amount:Number(e.amount),balanceAfter:Number(e.balance_after),reason:String(e.reason),operator:String(e.operator),createdAt:dateIso(e.created_at)}))})}));
 app.put('/api/me/profile',requireAuth,asyncRoute(async(req,res)=>{const nickname=cleanText(req.body.nickname,24),wechatId=cleanText(req.body.wechatId,40),emailNotifications=req.body.emailMessageNotifications!==false;if(nickname.length<2)return res.status(400).json({error:'昵称至少需要 2 个字符'});await run('UPDATE users SET nickname=?,wechat_id=?,email_message_notifications=? WHERE id=?',[nickname,wechatId,emailNotifications?1:0,req.user!.id]);res.json({user:publicUser(await one('SELECT * FROM users WHERE id=?',[req.user!.id]))})}));
 
 app.post('/api/conversations',requireAuth,requireCampus,asyncRoute(async(req,res)=>{
