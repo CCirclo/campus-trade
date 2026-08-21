@@ -18,3 +18,6 @@ npm-debug.log*
 
 # 系统文件
 .DS_Store
+
+# 本地 AI 辅助开发审计记录
+.codex-copilot-history/

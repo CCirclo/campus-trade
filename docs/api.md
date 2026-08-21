@@ -118,13 +118,19 @@
 
 | 参数 | 说明 |
 | --- | --- |
-| `keyword` | 标题/描述关键词（≤40 字符） |
+| `keyword` | 标题/类目/描述关键词（≤40 字符） |
 | `category` | 分类 |
 | `condition` | 成色 |
 | `schoolId` | 学校（默认 `ruc_suzhou`） |
 | `sort` | `latest`（默认）/ `priceAsc` / `priceDesc` |
+| `page` | 页码，从 1 开始（默认 1；`(page - 1) × pageSize` 不得超过 10,000） |
+| `pageSize` | 每页数量（默认 20，最大 100） |
 
-响应：`{ "items": [ Item... ], "total": n }`（最多 100 条）
+关键词会先归一化并扩展已配置的校园简称。**多个查询词之间是 AND 关系**：例如 `iphone 15` 必须同时命中 `iphone` 与 `15`；每个查询词的别名变体（如 高数 ↔ 高等数学）是组内 OR 替代。含数字/型号/版本的词使用非数字边界匹配，`15` 不会误命中 `150` 或 `2015`。默认排序按标题、类目、描述的加权相关度，再按发布时间和商品 ID 稳定排序。显式价格排序仍优先按价格排序。
+
+响应：`{ "items": [ Item... ], "total": n, "page": 1, "pageSize": 20, "hasMore": false }`。`total` 是全部匹配商品数（真实结果总数），`page`/`pageSize` 回显本次分页参数，`hasMore` 表示是否存在下一页，Web 端据此渲染上一页/下一页。非法分页参数（非整数、超出页码/每页数量上限或 OFFSET 超过 10,000）返回 HTTP 400。
+
+搜索实现、AND 语义与离线评测见 [`search.md`](search.md)。
 
 ### GET `/api/items/:id`
 

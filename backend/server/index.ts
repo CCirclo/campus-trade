@@ -12,6 +12,7 @@ import {cosConfigured,decodeObjectKey,signedObjectUrl,uploadToCos,validImageSign
 import {canonicalPair,itemCardSnapshot,shouldSendItemCard} from './conversations.js';
 import {mailConfigured,sendAdminCommentNotification,sendAdminFeedbackNotification,sendNewMessageNotification} from './mail.js';
 import {publicSellerProfile} from './profiles.js';
+import {buildKeywordSearch,parseKeyword,parsePagination} from './search.js';
 
 const app=express(),port=Number(process.env.PORT)||8787,host=process.env.HOST||'127.0.0.1',appOrigin=process.env.APP_ORIGIN||'http://localhost:5173';
 const asyncRoute=(handler:(req:AuthedRequest,res:Response,next:NextFunction)=>Promise<unknown>):RequestHandler=>(req,res,next)=>{void handler(req,res,next).catch(next)};
@@ -23,13 +24,21 @@ app.use(optionalAuth);app.use('/api/auth',authRouter);app.use('/api/admin',requi
 const itemSelect=`SELECT i.*,u.id AS seller_id,u.nickname AS seller_nickname,u.avatar_url AS seller_avatar,u.email AS seller_email,u.email_verified AS seller_email_verified,u.admin_verified AS seller_admin_verified FROM items i JOIN users u ON u.id=i.user_id`;
 
 app.get('/api/items',asyncRoute(async(req,res)=>{
-  const keyword=cleanText(req.query.keyword,40),category=cleanText(req.query.category,20),condition=cleanText(req.query.condition,20),schoolId=cleanText(req.query.schoolId,40)||'ruc_suzhou',sort=String(req.query.sort||'latest');
-  const clauses=[`i.school_id=?`,`i.status='在售'`],args:any[]=[schoolId];
-  if(keyword){clauses.push('(i.title LIKE ? OR i.description LIKE ?)');args.push(`%${keyword}%`,`%${keyword}%`)}
-  if(category&&categories.includes(category as typeof categories[number])){clauses.push('i.category=?');args.push(category)}
-  if(condition&&conditions.includes(condition as typeof conditions[number])){clauses.push('i.item_condition=?');args.push(condition)}
-  const order=sort==='priceAsc'?'i.price ASC':sort==='priceDesc'?'i.price DESC':'i.created_at DESC';
-  const rows=await all(`${itemSelect} WHERE ${clauses.join(' AND ')} ORDER BY ${order} LIMIT 100`,args);res.json({items:rows.map(mapItem),total:rows.length});
+  const parsedKeyword=parseKeyword(req.query.keyword);if(typeof parsedKeyword!=='string')return res.status(400).json({error:parsedKeyword.error});
+  const keyword=parsedKeyword,category=cleanText(req.query.category,20),condition=cleanText(req.query.condition,20),schoolId=cleanText(req.query.schoolId,40)||'ruc_suzhou',sort=String(req.query.sort||'latest');
+  const pagination=parsePagination(req.query.page,req.query.pageSize);if('error' in pagination)return res.status(400).json({error:pagination.error});
+  const clauses=[`i.school_id=?`,`i.status='在售'`],whereArgs:any[]=[schoolId],orderArgs:any[]=[];
+  let order=sort==='priceAsc'?'i.price ASC, i.created_at DESC, i.id DESC':sort==='priceDesc'?'i.price DESC, i.created_at DESC, i.id DESC':'i.created_at DESC, i.id DESC';
+  if(keyword){
+    const built=buildKeywordSearch(keyword);
+    clauses.push(built.whereClause);whereArgs.push(...built.whereArgs);
+    if(sort!=='priceAsc'&&sort!=='priceDesc'){order=`${built.scoreExpr} DESC, i.created_at DESC, i.id DESC`;orderArgs.push(...built.scoreArgs)}
+  }
+  if(category&&categories.includes(category as typeof categories[number])){clauses.push('i.category=?');whereArgs.push(category)}
+  if(condition&&conditions.includes(condition as typeof conditions[number])){clauses.push('i.item_condition=?');whereArgs.push(condition)}
+  const where=clauses.join(' AND '),totalRow=await one(`SELECT COUNT(*) AS total FROM items i WHERE ${where}`,whereArgs),total=Number(totalRow?.total||0),offset=(pagination.page-1)*pagination.pageSize;
+  const rows=await all(`${itemSelect} WHERE ${where} ORDER BY ${order} LIMIT ${pagination.pageSize} OFFSET ${offset}`,[...whereArgs,...orderArgs]);
+  res.json({items:rows.map(mapItem),total,page:pagination.page,pageSize:pagination.pageSize,hasMore:pagination.page*pagination.pageSize<total});
 }));
 
 app.get('/api/items/:id',asyncRoute(async(req,res)=>{
