@@ -53,4 +53,30 @@ npm run search:evaluate -- path/to/benchmark.json --json search-results.json
 
 当前查询仍基于 `LIKE` 与 `REGEXP_LIKE`，数据规模增大后需要结合生产数据运行 `EXPLAIN ANALYZE`。MySQL 8 ngram FULLTEXT 已纳入候选方案，但本次暂不增加强制索引迁移：应先在冻结 Benchmark 上验证召回收益，并评估索引体积、写入成本、中文 token 大小和生产回滚方式。
 
-本阶段也不包含向量召回；后续混合检索应复用本文的 Benchmark，并保留关键词通道作为型号和版本的精确保护。
+## 语义与混合检索（Issue #5）
+
+语义通道默认关闭。启用后，商品发布或编辑会把标准文本（标题、类目、成色、描述）加入后台向量队列；向量按 `item_id + model_version` 保存，带内容哈希、维度、归一化标记、状态和有限次指数退避。模型升级不会覆盖旧版本，可显式重算：
+
+```bash
+EMBEDDING_ENABLED=true npm run embeddings:rebuild -- --force
+```
+
+当前推荐中文短文本模型为 `BAAI/bge-small-zh-v1.5`（512 维、L2 归一化），通过 OpenAI-compatible `/embeddings` 服务调用。商品向量离线生成；每次查询只生成一次 Query Embedding。小规模阶段最多扫描 3000 条当前版本向量，关键词和语义各取 Top 200，再按 0.62/0.38 加权融合；精确标题额外乘 1.5，型号和版本仍受关键词通道保护。
+
+```dotenv
+EMBEDDING_ENABLED=true
+HYBRID_SEARCH_ENABLED=true
+EMBEDDING_API_URL=https://your-service/v1/embeddings
+EMBEDDING_API_KEY=...
+EMBEDDING_MODEL=BAAI/bge-small-zh-v1.5
+EMBEDDING_MODEL_VERSION=bge-small-zh-v1.5@1
+EMBEDDING_DIMENSIONS=512
+```
+
+服务超时、响应维度错误或不可用时，单次查询自动回退关键词候选；将 `HYBRID_SEARCH_ENABLED=false` 可立即全局回退。生产数据集的三路对比命令为：
+
+```bash
+npm run search:evaluate-hybrid -- path/to/production-benchmark.json
+```
+
+上线前必须使用真实 Embedding 服务和 #2 的匿名化 Benchmark 记录关键词、纯向量、混合三组 Recall@10、NDCG@10、MRR、P95 与存储开销。内置示例和单元测试只验证管线，不代表线上效果。

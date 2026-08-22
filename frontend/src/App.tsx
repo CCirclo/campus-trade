@@ -11,6 +11,7 @@ import AdminApp, { RequireAdmin } from './admin/AdminApp';
 import type { ChatMessage, Comment, Conversation, Item, PublicProfile, User } from './types';
 import {formatTimestamp} from './time';
 import {AvatarCropper} from './AvatarCropper';
+import {analyticsSessionId,itemAttribution,saveAttribution,track,type Attribution} from './analytics';
 
 const categories = [
   {name:'教材',icon:BookOpen,tone:'amber'}, {name:'电子产品',icon:Laptop,tone:'blue'},
@@ -58,8 +59,10 @@ function RequireCampus({children}:{children:ReactNode}){
 function PageLoading(){return <div className="page-loading"><span></span><p>正在加载校园好物…</p></div>}
 function ErrorState({message,retry}:{message:string;retry?:()=>void}){return <div className="empty-state"><span className="empty-icon">!</span><h2>暂时没能加载</h2><p>{message}</p>{retry&&<button className="button secondary" onClick={retry}>重新加载</button>}</div>}
 
-function ItemCard({item}:{item:Item}){
-  return <Link className="item-card" to={`/items/${item.id}`}>
+function ItemCard({item,attribution}:{item:Item;attribution?:Attribution}){
+  const ref=useRef<HTMLAnchorElement>(null),seen=useRef(false);
+  useEffect(()=>{if(!attribution||!ref.current)return;const observer=new IntersectionObserver(entries=>{if(!seen.current&&entries.some(entry=>entry.isIntersecting&&entry.intersectionRatio>=0.5)){seen.current=true;track('item_impression',attribution,{itemId:item.id});observer.disconnect()}},{threshold:0.5});observer.observe(ref.current);return()=>observer.disconnect()},[attribution?.requestId,item.id]);
+  return <Link ref={ref} className="item-card" to={`/items/${item.id}`} onClick={()=>{if(attribution){saveAttribution(item.id,attribution);track('item_click',attribution,{itemId:item.id})}}}>
     <div className="item-image-wrap"><img src={item.images[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=75'} alt={item.title}/><span className="condition-pill">{item.condition}</span></div>
     <div className="item-card-body"><h3>{item.title}</h3><p className="item-meta-line"><span>{item.category} · 同校面交</span><time dateTime={item.createdAt}>发布于 {formatTimestamp(item.createdAt)}</time></p><div><strong><small>¥</small>{item.price}</strong></div></div>
   </Link>;
@@ -71,29 +74,35 @@ function HomePage(){
   const [total,setTotal]=useState(0);
   const [pageSize,setPageSize]=useState(20);
   const [hasMore,setHasMore]=useState(false);
+  const [requestId,setRequestId]=useState('');
+  const [algorithmVersion,setAlgorithmVersion]=useState('latest-v1');
+  const [nextCursor,setNextCursor]=useState<string|null>(null);
+  const [previousCursor,setPreviousCursor]=useState<string|null>(null);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
   const [attempt,setAttempt]=useState(0);
-  const keyword=params.get('keyword')||''; const category=params.get('category')||''; const sort=params.get('sort')||'latest';
+  const pendingSearch=useRef<string|null>(null);
+  const keyword=params.get('keyword')||''; const category=params.get('category')||''; const sort=params.get('sort')||'latest';const cursor=params.get('cursor')||'';const isRecommendation=!keyword&&!category&&sort==='latest';
   const page=Math.max(1,Number.parseInt(params.get('page')||'1',10)||1);
   const [search,setSearch]=useState(keyword);
   useEffect(()=>setSearch(keyword),[keyword]);
   useEffect(()=>{
     const controller=new AbortController();
     setLoading(true);setError('');
-    const q=new URLSearchParams({schoolId:'ruc_suzhou',sort,page:String(page)});
+    const q=new URLSearchParams({schoolId:'ruc_suzhou'});
+    if(isRecommendation){q.set('sessionId',analyticsSessionId());if(cursor)q.set('cursor',cursor)}else{q.set('sort',sort);q.set('page',String(page))}
     if(keyword)q.set('keyword',keyword);
     if(category)q.set('category',category);
-    api<{items:Item[];total:number;page:number;pageSize:number;hasMore:boolean}>(`/api/items?${q}`,{signal:controller.signal})
-      .then(d=>{setItems(d.items);setTotal(d.total);setPageSize(d.pageSize);setHasMore(d.hasMore)})
+    api<{items:Item[];total?:number;page?:number;pageSize?:number;hasMore:boolean;requestId:string;algorithmVersion:string;nextCursor?:string|null;previousCursor?:string|null}>(`${isRecommendation?'/api/recommendations':'/api/items'}?${q}`,{signal:controller.signal})
+      .then(d=>{setItems(d.items);setTotal(d.total??d.items.length);setPageSize(d.pageSize??20);setHasMore(d.hasMore);setRequestId(d.requestId);setAlgorithmVersion(d.algorithmVersion);setNextCursor(d.nextCursor??null);setPreviousCursor(d.previousCursor??null);if(keyword&&pendingSearch.current===keyword){pendingSearch.current=null;track('search_submit',{requestId:d.requestId,algorithmVersion:d.algorithmVersion,source:'search',position:1},{query:keyword})}})
       .catch(e=>{if(controller.signal.aborted)return;setError(e instanceof Error?e.message:'加载失败')})
       .finally(()=>{if(!controller.signal.aborted)setLoading(false)});
     return ()=>controller.abort();
-  },[keyword,category,sort,page,attempt]);
-  const submit=(e:FormEvent)=>{e.preventDefault();const next=new URLSearchParams(params);search.trim()?next.set('keyword',search.trim()):next.delete('keyword');next.delete('page');setParams(next)};
-  const chooseCategory=(name:string)=>{const n=new URLSearchParams(params);category===name?n.delete('category'):n.set('category',name);n.delete('page');setParams(n)};
-  const changeSort=(value:string)=>{const n=new URLSearchParams(params);n.set('sort',value);n.delete('page');setParams(n)};
-  const gotoPage=(p:number)=>{if(p<1)return;const n=new URLSearchParams(params);n.set('page',String(p));setParams(n)};
+  },[keyword,category,sort,page,cursor,isRecommendation,attempt]);
+  const submit=(e:FormEvent)=>{e.preventDefault();const value=search.trim();pendingSearch.current=value||null;const next=new URLSearchParams(params);value?next.set('keyword',value):next.delete('keyword');next.delete('page');next.delete('cursor');setParams(next)};
+  const chooseCategory=(name:string)=>{const n=new URLSearchParams(params);category===name?n.delete('category'):n.set('category',name);n.delete('page');n.delete('cursor');setParams(n)};
+  const changeSort=(value:string)=>{const n=new URLSearchParams(params);n.set('sort',value);n.delete('page');n.delete('cursor');setParams(n)};
+  const gotoPage=(p:number,nextPageCursor?:string|null)=>{if(p<1)return;const n=new URLSearchParams(params);n.set('page',String(p));if(isRecommendation){nextPageCursor?n.set('cursor',nextPageCursor):n.delete('cursor')}setParams(n)};
   const lastPage=Math.max(1,Math.ceil(total/pageSize));
   return <>
     <section className="hero"><div className="hero-inner"><div><span className="eyebrow">RUC SUZHOU MARKET</span><h1>让闲置，在校园里<br/><em>继续被喜欢。</em></h1><p>只看同校真实好物，聊好细节，再当面交易。</p></div><div className="hero-art" aria-hidden="true"><div className="art-card one"><BookOpen/><span>教材笔记</span><b>¥28</b></div><div className="art-card two"><Laptop/><span>数码好物</span><b>¥168</b></div><span className="art-orbit">同校<br/>面交</span></div></div></section>
@@ -101,12 +110,12 @@ function HomePage(){
       <form className="search-bar" onSubmit={submit}><Search/><input value={search} onChange={e=>setSearch(e.target.value)} maxLength={40} placeholder="搜索教材、数码或宿舍好物" aria-label="搜索商品"/><button>搜索</button></form>
       <div className="category-strip">{categories.map(({name,icon:Icon,tone})=><button key={name} className={`category-button ${category===name?'active':''}`} onClick={()=>chooseCategory(name)}><span className={tone}><Icon/></span>{name}</button>)}</div>
       <Link className="safety-banner" to="/safety"><ShieldCheck/><span><b>校内限定 · 当面验货再交易</b><small>不提前支付押金，不点击陌生付款链接</small></span><ChevronRight/></Link>
-      <div className="section-head"><div><span className="eyebrow">JUST IN</span><h2>{keyword?`“${keyword}”的搜索结果`:category||'本校好物'}</h2><p>{keyword||category?`共找到 ${total} 件相关好物`:`${schoolName}同学正在转让 · 共 ${total} 件`}</p></div><label className="sort-select"><SlidersHorizontal/><select value={sort} onChange={e=>changeSort(e.target.value)}><option value="latest">最新发布</option><option value="priceAsc">价格从低到高</option><option value="priceDesc">价格从高到低</option></select></label></div>
-      {loading?<div className="item-grid skeleton-grid">{[1,2,3,4].map(n=><div key={n} className="skeleton-card"/>)}</div>:error?<ErrorState message={error} retry={()=>setAttempt(a=>a+1)}/>:items.length?<div className="item-grid">{items.map(i=><ItemCard key={i.id} item={i}/>)}</div>:<div className="empty-state"><span className="empty-icon">空</span><h2>这里还很安静</h2><p>换个关键词，或者返回上一页看看。</p><Link className="button primary" to="/publish">去发布</Link></div>}
+      <div className="section-head"><div><span className="eyebrow">{isRecommendation?'FOR YOU':'JUST IN'}</span><h2>{keyword?`“${keyword}”的搜索结果`:category||(isRecommendation?'为你推荐':'本校好物')}</h2><p>{isRecommendation?'结合新鲜度、热度与多样性，可随时回退最新发布':keyword||category?`共找到 ${total} 件相关好物`:`${schoolName}同学正在转让 · 共 ${total} 件`}</p></div><label className="sort-select"><SlidersHorizontal/><select value={sort} onChange={e=>changeSort(e.target.value)}><option value="latest">{isRecommendation?'智能推荐':'最新发布'}</option><option value="priceAsc">价格从低到高</option><option value="priceDesc">价格从高到低</option></select></label></div>
+      {loading?<div className="item-grid skeleton-grid">{[1,2,3,4].map(n=><div key={n} className="skeleton-card"/>)}</div>:error?<ErrorState message={error} retry={()=>setAttempt(a=>a+1)}/>:items.length?<div className="item-grid">{items.map((item,index)=><ItemCard key={item.id} item={item} attribution={{requestId,algorithmVersion,source:keyword?'search':'home',position:(page-1)*pageSize+index+1}}/>)}</div>:<div className="empty-state"><span className="empty-icon">空</span><h2>这里还很安静</h2><p>换个关键词，或者返回上一页看看。</p><Link className="button primary" to="/publish">去发布</Link></div>}
       {!loading&&!error&&total>0&&<nav className="pagination" aria-label="分页导航">
-        <button className="pagination-button" type="button" disabled={page<=1} onClick={()=>gotoPage(page-1)}><ChevronLeft/>上一页</button>
-        <span className="pagination-info">第 {page} / {lastPage} 页 · 共 {total} 件</span>
-        <button className="pagination-button" type="button" disabled={!hasMore} onClick={()=>gotoPage(page+1)}>下一页<ChevronRight/></button>
+        <button className="pagination-button" type="button" disabled={isRecommendation?!previousCursor:page<=1} onClick={()=>gotoPage(page-1,previousCursor)}><ChevronLeft/>上一页</button>
+        <span className="pagination-info">{isRecommendation?`第 ${page} 页`:`第 ${page} / ${lastPage} 页 · 共 ${total} 件`}</span>
+        <button className="pagination-button" type="button" disabled={!hasMore} onClick={()=>gotoPage(page+1,nextCursor)}>下一页<ChevronRight/></button>
       </nav>}
     </section>
   </>;
@@ -133,8 +142,9 @@ function ItemDetailPage(){
   if(loading)return <PageLoading/>;if(error||!item)return <ErrorState message={error||'商品不存在'} retry={load}/>;
   const mustLogin=()=>{navigate(`/login?next=${encodeURIComponent(`/items/${id}`)}`);return false};
   const mustCampus=()=>{setToast('你不是校园认证用户。请使用验证过的 @ruc.edu.cn 邮箱账号。');return false};
-  const toggle=async()=>{if(!user)return mustLogin();if(!user.campusVerified)return mustCampus();const d=await post<{favorited:boolean}>(`/api/items/${id}/favorite`);setFavorited(d.favorited);setToast(d.favorited?'已加入收藏':'已取消收藏')};
-  const chat=async()=>{if(!user)return mustLogin();if(!user.campusVerified)return mustCampus();try{const d=await post<{id:number}>('/api/conversations',{itemId:item.id});navigate(`/messages/${d.id}`)}catch(e){setToast(e instanceof Error?e.message:'无法发起会话')}};
+  const attribution=itemAttribution(item.id);
+  const toggle=async()=>{if(!user)return mustLogin();if(!user.campusVerified)return mustCampus();const d=await post<{favorited:boolean}>(`/api/items/${id}/favorite`,{requestId:attribution.requestId,sessionId:analyticsSessionId(),algorithmVersion:attribution.algorithmVersion});setFavorited(d.favorited);setToast(d.favorited?'已加入收藏':'已取消收藏')};
+  const chat=async()=>{if(!user)return mustLogin();if(!user.campusVerified)return mustCampus();try{const d=await post<{id:number}>('/api/conversations',{itemId:item.id,requestId:attribution.requestId,sessionId:analyticsSessionId(),algorithmVersion:attribution.algorithmVersion});navigate(`/messages/${d.id}`)}catch(e){setToast(e instanceof Error?e.message:'无法发起会话')}};
   const sendComment=async()=>{if(!user)return mustLogin();if(!user.campusVerified)return mustCampus();if(comment.trim().length<2)return;await post(`/api/items/${id}/comments`,{content:comment});setComment('');load()};
   const submitReport=async()=>{if(!user)return mustLogin();setReportBusy(true);try{await post('/api/reports',{itemId:item.id,reason:reportReason,detail:reportDetail});setReportOpen(false);setReportReason('');setReportDetail('');setToast('举报已提交，感谢你的反馈')}catch(e){setToast(e instanceof Error?e.message:'举报提交失败')}finally{setReportBusy(false)}};
   const mine=user?.id===item.userId;

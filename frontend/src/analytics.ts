@@ -1,0 +1,10 @@
+type EventType='search_submit'|'item_impression'|'item_click'|'favorite_add'|'favorite_remove'|'conversation_start';
+type Source='home'|'search'|'item_detail'|'favorites';
+export interface Attribution{requestId:string;algorithmVersion:string;source:Source;position:number}
+const SESSION_KEY='campus_analytics_session';let queue:unknown[]=[],timer:number|undefined;const impressed=new Set<string>();
+function uuid(){return crypto.randomUUID()}
+export function analyticsSessionId(){let value=sessionStorage.getItem(SESSION_KEY);if(!value){value=uuid();sessionStorage.setItem(SESSION_KEY,value)}return value}
+function flush(){timer=undefined;if(!queue.length)return;const events=queue.splice(0,50);void fetch(`${import.meta.env.BASE_URL==='/'?'':import.meta.env.BASE_URL.replace(/\/$/,'')}/api/events/batch`,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',keepalive:true,body:JSON.stringify({events})}).catch(()=>{});if(queue.length)timer=window.setTimeout(flush,250)}
+export function track(type:EventType,attribution:Attribution,extra:{itemId?:number;query?:string}={}){if(type==='item_impression'){const key=`${attribution.requestId}:${extra.itemId}`;if(impressed.has(key))return;impressed.add(key)}queue.push({eventId:uuid(),requestId:attribution.requestId,sessionId:analyticsSessionId(),type,source:attribution.source,itemId:extra.itemId,query:extra.query,position:type==='item_impression'||type==='item_click'?attribution.position:undefined,occurredAt:new Date().toISOString(),algorithmVersion:attribution.algorithmVersion});if(!timer)timer=window.setTimeout(flush,250)}
+export function saveAttribution(itemId:number,value:Attribution){sessionStorage.setItem(`campus_item_attribution:${itemId}`,JSON.stringify(value))}
+export function itemAttribution(itemId:number):Attribution{try{const value=JSON.parse(sessionStorage.getItem(`campus_item_attribution:${itemId}`)||'null') as Attribution|null;if(value?.requestId)return value}catch{}return{requestId:uuid(),algorithmVersion:'direct-v1',source:'item_detail',position:1}}
