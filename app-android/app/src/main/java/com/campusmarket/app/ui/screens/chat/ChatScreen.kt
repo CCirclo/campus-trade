@@ -27,6 +27,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -53,7 +54,10 @@ fun ChatScreen(
     onOpenItem: (Long) -> Unit = {},
     vm: ChatViewModel = viewModel(),
 ) {
-    LaunchedEffect(conversationId) { vm.start(conversationId) }
+    DisposableEffect(conversationId, vm) {
+        vm.start(conversationId)
+        onDispose { vm.stop() }
+    }
     val listState = rememberLazyListState()
     LaunchedEffect(vm.messages.size) {
         if (vm.messages.isNotEmpty()) {

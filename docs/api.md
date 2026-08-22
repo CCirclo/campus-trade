@@ -237,7 +237,7 @@
     "lungmen": { "code": "lungmen", "name": "龙门币", "description": "通用货币 · 可兑换商品与抽奖", "balance": 200 }
   },
   "entries": [
-    { "id": 1, "currency": "lungmen", "amount": 100, "balanceAfter": 200, "reason": "社区贡献奖励", "operator": "admin@example.com", "createdAt": "2026-08-20T08:00:00.000Z" }
+    { "id": 1, "currency": "lungmen", "amount": 100, "balanceAfter": 200, "reason": "社区贡献奖励", "operator": "管理员", "createdAt": "2026-08-20T08:00:00.000Z" }
   ]
 }
 ```

@@ -12,6 +12,10 @@ import kotlinx.coroutines.launch
 
 /** 首页商品流:搜索/分类/排序。 */
 class HomeViewModel : ViewModel() {
+    private val pageSize = 20
+    private var page = 1
+    private var queryVersion = 0
+
     var keyword by mutableStateOf("")
     var category by mutableStateOf("")
         private set
@@ -21,7 +25,15 @@ class HomeViewModel : ViewModel() {
         private set
     var loading by mutableStateOf(true)
         private set
+    var loadingMore by mutableStateOf(false)
+        private set
+    var total by mutableStateOf(0)
+        private set
+    var hasMore by mutableStateOf(false)
+        private set
     var error by mutableStateOf("")
+        private set
+    var loadMoreError by mutableStateOf("")
         private set
 
     init {
@@ -29,34 +41,61 @@ class HomeViewModel : ViewModel() {
     }
 
     fun search() {
-        load()
+        load(reset = true)
     }
 
     fun selectCategory(value: String) {
         category = value
-        load()
+        load(reset = true)
     }
 
     fun selectSort(value: String) {
         sort = value
-        load()
+        load(reset = true)
     }
 
-    fun reload() = load()
+    fun reload() = load(reset = true)
 
-    private fun load() {
+    fun loadMore() = load(reset = false)
+
+    private fun load(reset: Boolean = true) {
+        if (!reset && (loadingMore || !hasMore)) return
+        val version = if (reset) ++queryVersion else queryVersion
+        val targetPage = if (reset) 1 else page + 1
         viewModelScope.launch {
-            loading = true
-            error = ""
+            if (reset) {
+                loading = true
+                error = ""
+                loadMoreError = ""
+            } else {
+                loadingMore = true
+                loadMoreError = ""
+            }
             runCatching {
                 ApiClient.api.items(
                     keyword = keyword.trim().ifBlank { null },
                     category = category.ifBlank { null },
                     sort = sort,
+                    page = targetPage,
+                    pageSize = pageSize,
                 )
-            }.onSuccess { items = it.items }
-                .onFailure { error = it.toApiException().message }
-            loading = false
+            }.onSuccess { response ->
+                if (version != queryVersion) return@onSuccess
+                items = if (reset) response.items else (items + response.items).distinctBy { it.id }
+                page = response.page
+                total = response.total
+                hasMore = response.hasMore
+            }
+                .onFailure {
+                    if (version == queryVersion) {
+                        val message = it.toApiException().message
+                        if (reset) error = message else loadMoreError = message
+                    }
+                }
+            if (version == queryVersion) {
+                loading = false
+                loadingMore = false
+            }
         }
     }
 }

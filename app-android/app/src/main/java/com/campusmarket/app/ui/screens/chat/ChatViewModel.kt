@@ -59,6 +59,7 @@ class ChatViewModel : ViewModel() {
     private var pollJob: Job? = null
 
     fun start(id: Long) {
+        pollJob?.cancel()
         conversationId = id
         load()
         pollJob = viewModelScope.launch {
@@ -67,6 +68,11 @@ class ChatViewModel : ViewModel() {
                 load(silent = true)
             }
         }
+    }
+
+    fun stop() {
+        pollJob?.cancel()
+        pollJob = null
     }
 
     fun load(silent: Boolean = false) {
@@ -100,7 +106,7 @@ class ChatViewModel : ViewModel() {
     }
 
     override fun onCleared() {
-        pollJob?.cancel()
+        stop()
         super.onCleared()
     }
 }

@@ -202,7 +202,13 @@ data class UserResponse(val user: User)
 data class OkResponse(val ok: Boolean = true)
 
 @Serializable
-data class ItemsResponse(val items: List<Item> = emptyList(), val total: Int = 0)
+data class ItemsResponse(
+    val items: List<Item> = emptyList(),
+    val total: Int = 0,
+    val page: Int = 1,
+    val pageSize: Int = 20,
+    val hasMore: Boolean = false,
+)
 
 @Serializable
 data class ItemDetailResponse(

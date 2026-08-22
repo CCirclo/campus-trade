@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -105,7 +106,7 @@ fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "共 ${vm.items.size} 件在售",
+                "共 ${vm.total} 件在售",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.weight(1f),
@@ -139,6 +140,21 @@ fun HomeScreen(
                         item = item,
                         onClick = { onOpenItem(item.id) },
                     )
+                }
+                if (vm.hasMore) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                            if (vm.loadMoreError.isNotBlank()) {
+                                Text(vm.loadMoreError, color = MaterialTheme.colorScheme.error)
+                            }
+                            TextButton(
+                                onClick = { vm.loadMore() },
+                                enabled = !vm.loadingMore,
+                            ) {
+                                Text(if (vm.loadingMore) "加载中…" else if (vm.loadMoreError.isBlank()) "加载更多" else "重试")
+                            }
+                        }
+                    }
                 }
             }
         }

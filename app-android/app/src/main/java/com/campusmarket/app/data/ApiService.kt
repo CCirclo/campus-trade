@@ -47,6 +47,8 @@ interface ApiService {
         @Query("condition") condition: String? = null,
         @Query("schoolId") schoolId: String = "ruc_suzhou",
         @Query("sort") sort: String = "latest",
+        @Query("page") page: Int = 1,
+        @Query("pageSize") pageSize: Int = 20,
     ): ItemsResponse
 
     @GET("api/items/{id}")
