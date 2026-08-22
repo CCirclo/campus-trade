@@ -61,7 +61,7 @@ npm run search:evaluate -- path/to/benchmark.json --json search-results.json
 EMBEDDING_ENABLED=true npm run embeddings:rebuild -- --force
 ```
 
-当前推荐中文短文本模型为 `BAAI/bge-small-zh-v1.5`（512 维、L2 归一化），通过 OpenAI-compatible `/embeddings` 服务调用。商品向量离线生成；每次查询只生成一次 Query Embedding。小规模阶段最多扫描 3000 条当前版本向量，关键词和语义各取 Top 200，再按 0.62/0.38 加权融合；精确标题额外乘 1.5，型号和版本仍受关键词通道保护。
+当前推荐中文短文本模型为 `BAAI/bge-small-zh-v1.5`（512 维、L2 归一化），通过 OpenAI-compatible `/embeddings` 服务调用。商品向量在后台生成；每次查询只生成一次 Query Embedding。默认最多扫描 500 条当前版本向量（配置上限 1000），关键词和语义各取 Top 200，再按 0.62/0.38 加权融合；精确标题额外乘 1.5，型号和版本仍受关键词通道保护。
 
 ```dotenv
 EMBEDDING_ENABLED=true

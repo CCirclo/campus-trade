@@ -172,13 +172,13 @@
 ```
 
 - `images` 最多 9 张
-- 响应 `201`：`{ "id": 1 }`
+- 响应 `201`：`{ "id": 1, "embeddingStatus": "pending|ready|disabled|missing" }`。向量任务只需持久化入队即返回，不等待模型推理。
 
 ### PATCH `/api/items/:id`
 
 请求体同 POST，另可传 `status`（`在售`/`已售出`/`已下架`）。
 
-响应：`{ "ok": true }`
+响应：`{ "ok": true, "embeddingStatus": "pending|ready|disabled|missing" }`
 
 ### POST `/api/items/:id/favorite`
 
