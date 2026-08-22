@@ -3,19 +3,17 @@ name: Test and deploy campus market
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: campus-market-${{ github.event.pull_request.number || 'production' }}
+  group: campus-market-production
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  build-and-deploy:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -28,24 +26,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run build
-
-  deploy:
-    if: github.event_name != 'pull_request'
-    needs: test
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    env:
-      VITE_BASE_PATH: /campus-trade/
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
       - run: npm run build
       - name: Create release package
         run: |
@@ -70,18 +50,3 @@ jobs:
           scp -i ~/.ssh/deploy_key "$archive" "${DEPLOY_USER}@${DEPLOY_HOST}:/tmp/$archive"
           ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "sudo /usr/local/sbin/deploy-campus-market '/tmp/$archive' '$GITHUB_SHA'"
-      - name: Install and enable memory-bounded local embedding
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-        run: |
-          ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "sudo -n /srv/campus-market/current/backend/deploy/install-local-embedding /srv/campus-market/current"
-      - name: Report production resource status
-        if: always()
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-        run: |
-          ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "free -m; command -v docker || true; systemctl is-active campus-embedding.service || true"
