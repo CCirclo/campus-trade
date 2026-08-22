@@ -1,93 +1,108 @@
 # 校园闲鱼（campus-trade）
 
-校园二手闲置交易平台——同校好物、放心交易。本仓库为多端统一代码仓库，Web 端已实现，iOS / Android 端预留位置。
+面向校内用户的多端二手闲置交易平台。仓库包含 React Web、SwiftUI iOS、Jetpack Compose Android、Node.js API、MySQL 数据层，以及搜索、推荐、钱包和自动部署能力。
+
+- 线上地址：<https://20250821cdcdifc.top/campus-trade/>
+- 健康检查：<https://20250821cdcdifc.top/campus-trade/api/health>
+- API 文档：[`docs/api.md`](docs/api.md)
+- 架构与运维文档：[`docs/README.md`](docs/README.md)
 
 ## 仓库结构
 
-```
-project
-│
-├── frontend/        # Web 前端（React + Vite）—— ✅ 已实现
-│
-├── app-ios/         # iOS 客户端（Swift / SwiftUI）—— ⏳ 预留，待开发
-│
-├── app-android/     # Android 客户端（Kotlin / Jetpack Compose）—— ⏳ 预留，待开发
-│
-├── backend/         # 后端 API（Node.js + Express + MySQL）—— ✅ 已实现
-│
-├── docs/            # 接口文档与技术文档
-│
-└── README.md        # 本文件
-```
-
-## 各模块说明
-
 | 目录 | 说明 | 状态 |
 | --- | --- | --- |
-| `frontend/` | Web 前端，基于 React 19 + Vite 7，移动优先布局，含管理后台 | ✅ 已实现 |
-| `backend/` | 后端 API，Node.js + Express 5 + MySQL 8，含邮箱验证码注册登录、腾讯云 COS 图片存储、站内聊天、举报与管理后台接口 | ✅ 已实现 |
-| `app-ios/` | iOS 客户端（预留） | ⏳ 预留 |
-| `app-android/` | Android 客户端（预留） | ⏳ 预留 |
-| `docs/` | 架构、接口、搜索/推荐与运维文档 | 📄 见 [`docs/README.md`](docs/README.md) |
+| `frontend/` | React 19 + Vite 7 Web 客户端，含移动端布局和管理后台 | ✅ 已实现 |
+| `app-ios/` | SwiftUI 原生客户端，支持 iOS 17+ | ✅ 已实现 |
+| `app-android/` | Kotlin + Jetpack Compose 原生客户端，minSdk 26 / targetSdk 35 | ✅ 已实现 |
+| `backend/` | Express 5 API、MySQL 数据层、后台任务、部署脚本 | ✅ 已实现 |
+| `docs/` | API、架构、搜索、推荐、配置、部署与运维文档 | ✅ 持续维护 |
 
-## 快速开始（Web 全栈）
+## 已实现能力
+
+- 邮箱验证码注册、登录、找回/修改密码和 Cookie 会话
+- 校内身份边界、用户资料、头像、邮件通知和管理后台
+- 商品发布/编辑、图片上传、分类筛选、收藏、评论、举报和站内聊天
+- 关键词归一化、校园别名、型号精确匹配、分页与离线搜索评测
+- 可选本地 Embedding、混合检索、行为事件、灰度推荐与指标分析
+- Android 商品分页、聊天轮询、Keystore 会话加密和只读奖励钱包
+- 管理员奖励发放、并发安全钱包流水和用户端余额查询
+- GitHub Actions PR 校验、受保护分支合并和服务器原子发布/回滚
+
+详细边界和降级顺序见 [`docs/architecture.md`](docs/architecture.md)、[`docs/search.md`](docs/search.md) 和 [`docs/recommendation.md`](docs/recommendation.md)。
+
+## 本地开发
+
+### Web 与后端
 
 要求 Node.js 22+ 与 MySQL 8.0+：
 
 ```bash
-cp .env.example .env   # 填写 MySQL、邮箱 SMTP、腾讯云 COS 等配置
-npm install
-npm run dev            # 前端 :5173，API :8787
+cp .env.example .env
+npm ci
+npm run dev
 ```
 
-生产环境构建与检查：
+默认 Web 地址为 `http://localhost:5173`，API 地址为 `http://localhost:8787`。`.env` 需要填写 MySQL；SMTP、腾讯云 COS、Embedding 和推荐均可按文档选择配置。
+
+常用检查：
 
 ```bash
 npm test
+npm run typecheck
 npm run build
-NODE_ENV=production npm start
 ```
 
-详细说明见 [`frontend/README.md`](frontend/README.md)。
+### Android
 
-## 项目文档
+要求 JDK 17 与 Android SDK 35：
 
-- [`docs/README.md`](docs/README.md) —— 文档索引
-- [`docs/architecture.md`](docs/architecture.md) —— 系统架构、数据流和不变量
-- [`docs/api.md`](docs/api.md) —— REST API
-- [`docs/configuration.md`](docs/configuration.md) —— 环境变量与密钥
-- [`docs/operations.md`](docs/operations.md) —— 生产运维、Embedding、降级和回滚
-- [`docs/release-checklist.md`](docs/release-checklist.md) —— 上线检查清单
+```bash
+cd app-android
+./gradlew assembleDebug
+```
 
-## 生产部署
+Debug 默认通过模拟器地址 `http://10.0.2.2:8787/` 连接本地 API；Release 固定连接生产 HTTPS 地址。完整说明见 [`app-android/README.md`](app-android/README.md)。
 
-- 线上地址：<https://20250821cdcdifc.top/campus-trade/>
-- 健康检查：<https://20250821cdcdifc.top/campus-trade/api/health>
-- 服务器：腾讯云 Ubuntu Server 24.04 LTS（Node.js 22、MySQL 8、Nginx）
-- 服务名：`campus-market-web.service`
-- 发布目录：`/srv/campus-market/releases/<commit-sha>`
-- 当前版本：`/srv/campus-market/current`
-- 环境配置：`/etc/campus-market/.env`，不得提交到 Git
+### iOS
 
-推送到 `main` 后，[GitHub Actions](.github/workflows/deploy.yml) 会依次执行
-`npm ci`、测试和生产构建，再通过 SSH 发布。服务器使用 npmmirror 安装依赖，
-发布脚本会原子切换 `current` 链接、重启服务并检查 `/api/health`；失败时自动
-恢复上一个可用版本，最多保留 5 个历史版本。
+使用 Xcode 打开 `app-ios/CampusMarket.xcodeproj`，选择 `CampusMarket` scheme 和 iPhone 模拟器运行。首次真机构建需要配置开发团队，详见 [`app-ios/README.md`](app-ios/README.md)。
 
-仓库需要配置以下 Actions Secrets：
+## 搜索、推荐与钱包工具
 
-- `DEPLOY_HOST`：服务器地址
-- `DEPLOY_USER`：受限部署用户
-- `DEPLOY_SSH_KEY`：专用部署私钥
-- `DEPLOY_HOST_KEY`：服务器 SSH host key
+```bash
+npm run search:evaluate
+npm run search:evaluate-hybrid
+npm run recommendation:evaluate
+npm run embeddings:rebuild
+npm run grant -- <邮箱> <币种> <数量> <原因>
+```
 
-服务器只允许部署用户免密执行固定的 `/usr/local/sbin/deploy-campus-market`，
-不授予通用 root shell。数据库已从重装前备份恢复；部署不会覆盖数据库。
+生产环境启用 Embedding 或推荐前，请先阅读 [`docs/configuration.md`](docs/configuration.md) 和 [`docs/release-checklist.md`](docs/release-checklist.md)。奖励发放必须由服务器管理员执行，用户 API 只提供余额和流水读取。
 
-## 待办 / 预留
+## CI 与生产部署
 
-- [ ] iOS 客户端（`app-ios/`）
-- [ ] Android 客户端（`app-android/`）
+Pull Request 通过 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 并行执行：
+
+- 后端测试、TypeScript 检查和 Web 生产构建
+- Android Debug 与 Release 构建
+
+合并到受保护的 `main` 后，[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) 会测试、构建、打包并通过 SSH 发布到腾讯云 Ubuntu Server 24.04 LTS。服务器原子切换 `/srv/campus-market/current`，健康检查失败时自动回滚，并保留最近 5 个版本。
+
+生产环境配置保存在 `/etc/campus-market/.env`，不得提交到 Git。部署账户只允许执行固定部署脚本，不拥有通用 root shell。首次接入、Secrets、回滚和排障见：
+
+- [`docs/github-actions-deployment.md`](docs/github-actions-deployment.md)
+- [`docs/operations.md`](docs/operations.md)
+- [`docs/release-checklist.md`](docs/release-checklist.md)
+
+## 文档索引
+
+- [`docs/README.md`](docs/README.md) —— 完整文档导航
+- [`docs/api.md`](docs/api.md) —— REST API 与钱包接口
+- [`docs/architecture.md`](docs/architecture.md) —— 组件、数据流和关键不变量
+- [`docs/configuration.md`](docs/configuration.md) —— 环境变量和密钥
+- [`docs/search.md`](docs/search.md) —— 关键词、语义与混合检索
+- [`docs/recommendation.md`](docs/recommendation.md) —— 推荐策略、灰度和指标
+- [`docs/operations.md`](docs/operations.md) —— 发布、监控、降级和回滚
 
 ## 许可证
 
