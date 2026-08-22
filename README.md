@@ -28,7 +28,7 @@ project
 | `backend/` | 后端 API，Node.js + Express 5 + MySQL 8，含邮箱验证码注册登录、腾讯云 COS 图片存储、站内聊天、举报与管理后台接口 | ✅ 已实现 |
 | `app-ios/` | iOS 客户端（预留） | ⏳ 预留 |
 | `app-android/` | Android 客户端（预留） | ⏳ 预留 |
-| `docs/` | 接口文档 | 📄 见 [`docs/api.md`](docs/api.md) |
+| `docs/` | 架构、接口、搜索/推荐与运维文档 | 📄 见 [`docs/README.md`](docs/README.md) |
 
 ## 快速开始（Web 全栈）
 
@@ -50,9 +50,14 @@ NODE_ENV=production npm start
 
 详细说明见 [`frontend/README.md`](frontend/README.md)。
 
-## 接口文档
+## 项目文档
 
-- [`docs/api.md`](docs/api.md) —— 后端 REST API 完整接口文档
+- [`docs/README.md`](docs/README.md) —— 文档索引
+- [`docs/architecture.md`](docs/architecture.md) —— 系统架构、数据流和不变量
+- [`docs/api.md`](docs/api.md) —— REST API
+- [`docs/configuration.md`](docs/configuration.md) —— 环境变量与密钥
+- [`docs/operations.md`](docs/operations.md) —— 生产运维、Embedding、降级和回滚
+- [`docs/release-checklist.md`](docs/release-checklist.md) —— 上线检查清单
 
 ## 生产部署
 
@@ -83,7 +88,6 @@ NODE_ENV=production npm start
 
 - [ ] iOS 客户端（`app-ios/`）
 - [ ] Android 客户端（`app-android/`）
-- [ ] 更多接口与部署文档（`docs/`）
 
 ## 许可证
 
