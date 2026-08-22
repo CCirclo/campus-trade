@@ -17,6 +17,9 @@
 
 ```sudoers
 deploy ALL=(root) NOPASSWD: /usr/local/sbin/deploy-campus-market
+deploy ALL=(root) NOPASSWD: /srv/campus-market/current/backend/deploy/install-local-embedding /srv/campus-market/current
 ```
+
+本地语义检索还需要 Docker，并且安装时至少有 1.5 GiB `MemAvailable`。部署工作流会运行有界内存的 `BAAI/bge-small-zh-v1.5` 服务；条件不足或安装失败时，环境文件会恢复，Web 服务继续使用关键词检索。
 
 首次恢复数据库后，在 GitHub 手动运行 `Test and deploy campus market`。后续推送到 `main` 会自动发布，失败时脚本自动恢复上一个版本。

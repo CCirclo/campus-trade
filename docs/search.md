@@ -71,7 +71,13 @@ EMBEDDING_API_KEY=...
 EMBEDDING_MODEL=BAAI/bge-small-zh-v1.5
 EMBEDDING_MODEL_VERSION=bge-small-zh-v1.5@1
 EMBEDDING_DIMENSIONS=512
+EMBEDDING_BATCH_SIZE=1
+EMBEDDING_MAX_PENDING=8
+EMBEDDING_VECTOR_SCAN_LIMIT=500
+HYBRID_SPARSE_RESULT_THRESHOLD=12
 ```
+
+生产环境使用 `backend/deploy/campus-embedding.service` 在本机运行 `BAAI/bge-small-zh-v1.5`。商品发布或编辑时只将任务持久化入库并立即返回，后台严格串行生成且不重算内容未变的商品。搜索结果充足时，模型忙会直接回退关键词检索；结果不足时，搜索请求会在有界队列中优先于尚未开始的商品任务。
 
 服务超时、响应维度错误或不可用时，单次查询自动回退关键词候选；将 `HYBRID_SEARCH_ENABLED=false` 可立即全局回退。生产数据集的三路对比命令为：
 
