@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  debug 专属 manifest:仅在 debug 构建启用明文网络例外,便于本地调试;
+  release 不包含此配置,默认禁止明文 HTTP,只允许 HTTPS。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+</manifest>

@@ -49,12 +49,21 @@ object SessionManager {
 
     private fun prefs() = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    /** 持久化的会话 Cookie 值。 */
+    /** 持久化的会话 Cookie 值(使用 Android Keystore 加密后落盘)。 */
     var cookie: String?
-        get() = prefs().getString(KEY_COOKIE, null)
+        get() = prefs().getString(KEY_COOKIE, null)?.let { SecureSessionStore.decrypt(it) }
         private set(value) {
+            val encoded = if (value.isNullOrBlank()) {
+                null
+            } else {
+                try {
+                    SecureSessionStore.encrypt(value)
+                } catch (_: Exception) {
+                    null
+                }
+            }
             prefs().edit().apply {
-                if (value.isNullOrBlank()) remove(KEY_COOKIE) else putString(KEY_COOKIE, value)
+                if (encoded == null) remove(KEY_COOKIE) else putString(KEY_COOKIE, encoded)
             }.apply()
         }
 

@@ -5,8 +5,10 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// API 基地址:优先命令行 -PcampusApiBaseUrl=...,其次 gradle.properties,最后模拟器默认值。
-val apiBaseUrl: String = (project.findProperty("campusApiBaseUrl") as String?) ?: "http://10.0.2.2:8787/"
+// API 基地址:debug 优先命令行 -PcampusApiBaseUrl=...,其次 gradle.properties,最后模拟器默认值;
+// release 固定指向生产 HTTPS 地址,避免正式包连接局域网或明文传输。
+val debugApiBaseUrl: String = (project.findProperty("campusApiBaseUrl") as String?) ?: "http://10.0.2.2:8787/"
+val releaseApiBaseUrl: String = "https://20250821cdcdifc.top/campus-trade/"
 
 android {
     namespace = "com.campusmarket.app"
@@ -18,11 +20,14 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
-        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "API_BASE_URL", "\"$debugApiBaseUrl\"")
+        }
         release {
+            buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

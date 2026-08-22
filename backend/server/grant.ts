@@ -74,20 +74,25 @@ async function grant() {
     if (answer.trim().toLowerCase() !== 'yes') return fail('已取消，未发放任何奖励');
   }
 
-  const operator = cleanText(process.env.ADMIN_OPERATOR_NAME || process.env.ADMIN_NOTIFICATION_EMAIL || 'cli', 160);
+  const operator = cleanText(process.env.ADMIN_OPERATOR_NAME || '管理员', 160);
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    await connection.execute('INSERT INTO wallets (user_id,currency,balance) VALUES (?,?,?) ON DUPLICATE KEY UPDATE balance=balance+VALUES(balance)', [Number(user.id), currency, amount]);
-    await connection.execute('INSERT INTO currency_ledger (user_id,currency,amount,balance_after,reason,operator) VALUES (?,?,?,?,?,?)', [Number(user.id), currency, amount, after, reason, operator]);
+    // 先确保钱包行存在,再在事务内锁定该行读取余额并计算,避免并发发放产生错误账本
+    await connection.execute('INSERT INTO wallets (user_id,currency,balance) VALUES (?,?,0) ON DUPLICATE KEY UPDATE balance=balance', [Number(user.id), currency]);
+    const [locked] = await connection.execute<any[]>('SELECT balance FROM wallets WHERE user_id=? AND currency=? FOR UPDATE', [Number(user.id), currency]);
+    const lockedBefore = Number(locked[0]?.balance || 0);
+    const lockedAfter = lockedBefore + amount;
+    await connection.execute('UPDATE wallets SET balance=? WHERE user_id=? AND currency=?', [lockedAfter, Number(user.id), currency]);
+    await connection.execute('INSERT INTO currency_ledger (user_id,currency,amount,balance_after,reason,operator) VALUES (?,?,?,?,?,?)', [Number(user.id), currency, amount, lockedAfter, reason, operator]);
     await connection.commit();
+    console.log(`发放成功: ${String(user.nickname)} +${amount} ${def.name}，当前余额 ${lockedAfter}（操作者: ${operator}）`);
   } catch (error) {
     await connection.rollback();
     throw error;
   } finally {
     connection.release();
   }
-  console.log(`发放成功: ${String(user.nickname)} +${amount} ${def.name}，当前余额 ${after}（操作者: ${operator}）`);
 }
 
 grant().catch(error => { console.error('发放失败:', error); process.exitCode = 1; });
