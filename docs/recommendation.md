@@ -19,12 +19,14 @@
 生产必须配置互不相同的随机密钥：
 
 ```dotenv
-ANALYTICS_HASH_SECRET=至少32字符随机值
-CURSOR_SIGNING_SECRET=另一个至少32字符随机值
+ANALYTICS_HASH_SECRET=至少32字符随机值（推荐）
+CURSOR_SIGNING_SECRET=另一个至少32字符随机值（推荐）
 RECOMMENDATION_ENABLED=true
 RECOMMENDATION_ROLLOUT_PERCENT=5
 RECOMMENDATION_ALGORITHM_VERSION=home-rules-v1
 ```
+
+为兼容旧生产环境，专用密钥缺失时会分别生成独立的 256 位随机值并持久化到 `runtime_secrets`；环境中的专用随机密钥仍是首选。
 
 推荐权重可通过 `RECOMMENDATION_WEIGHT_INTEREST/FRESHNESS/POPULARITY/PRICE/EXPLORATION` 和 `RECOMMENDATION_REPEAT_PENALTY` 调整。所有值均有边界校验，非法配置自动使用保守默认值。
 
