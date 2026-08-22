@@ -1,4 +1,5 @@
 import { createHash,createHmac } from 'node:crypto';
+import {runtimeSecret} from './runtime-secret.js';
 
 export const EVENT_TYPES = ['search_submit','item_impression','item_click','favorite_add','favorite_remove','conversation_start'] as const;
 export const EVENT_SOURCES = ['home','search','item_detail','favorites'] as const;
@@ -20,7 +21,7 @@ const ITEM_EVENTS=new Set<EventType>(['item_impression','item_click','favorite_a
 export function queryFingerprint(value:unknown){
   const normalized=String(value??'').normalize('NFKC').toLocaleLowerCase('zh-CN').trim().replace(/\s+/g,' ');
   if(!normalized||normalized.length>40)return null;
-  const secret=process.env.ANALYTICS_HASH_SECRET||'development-query-hash-secret';return createHmac('sha256',secret).update(normalized).digest('hex');
+  const secret=runtimeSecret('analytics');return createHmac('sha256',secret).update(normalized).digest('hex');
 }
 
 export function impressionEventId(requestId:string,itemId:number){

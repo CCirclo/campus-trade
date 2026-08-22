@@ -19,6 +19,7 @@ import {recordServerEvent,storeBehaviorEvents} from './events-store.js';
 import {enqueueItemEmbedding,kickEmbeddingWorker,startEmbeddingWorker} from './embedding-store.js';
 import {hybridItemIds,hybridSearchEnabled} from './hybrid-search-service.js';
 import {RecommendationInputError,recommendations} from './recommendation-service.js';
+import {initRuntimeSecrets} from './runtime-secret.js';
 
 const app=express(),port=Number(process.env.PORT)||8787,host=process.env.HOST||'127.0.0.1',appOrigin=process.env.APP_ORIGIN||'http://localhost:5173';
 const asyncRoute=(handler:(req:AuthedRequest,res:Response,next:NextFunction)=>Promise<unknown>):RequestHandler=>(req,res,next)=>{void handler(req,res,next).catch(next)};
@@ -110,4 +111,4 @@ app.get('/api/health',asyncRoute(async(_req,res)=>{await pool.query('SELECT 1');
 const dist=resolve(process.cwd(),'frontend','dist');if(existsSync(dist)){app.use(express.static(dist));app.use((req:Request,res:Response,next)=>{if(req.method!=='GET'||req.path.startsWith('/api/'))return next();res.sendFile(join(dist,'index.html'),error=>{if(error)next(error)})})}
 app.use((error:unknown,req:Request,res:Response,_next:NextFunction)=>{console.error(error);const message=error instanceof multer.MulterError?(error.code==='LIMIT_FILE_SIZE'?(req.path==='/api/me/avatar'?'头像图片不能超过 2MB':'单张图片不能超过 5MB'):'图片上传失败'):'服务器暂时无法处理请求';res.status(500).json({error:message})});
 
-initDatabase().then(async()=>{await startEmbeddingWorker();app.listen(port,host,()=>console.log(`Campus Market listening on http://${host}:${port}`))}).catch(error=>{console.error('MySQL initialization failed:',error);process.exitCode=1});
+initDatabase().then(async()=>{await initRuntimeSecrets();await startEmbeddingWorker();app.listen(port,host,()=>console.log(`Campus Market listening on http://${host}:${port}`))}).catch(error=>{console.error('MySQL initialization failed:',error);process.exitCode=1});

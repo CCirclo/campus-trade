@@ -1,11 +1,12 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {all,mapItem,type DbRow} from './db.js';
 import {decodeRecommendationCursor,encodeRecommendationCursor,rankCandidates,recommendationConfig,type RecommendationCandidate} from './recommendation.js';
+import {runtimeSecret} from './runtime-secret.js';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const itemSelect=`SELECT i.*,u.id AS seller_id,u.nickname AS seller_nickname,u.avatar_url AS seller_avatar,u.email AS seller_email,u.email_verified AS seller_email_verified,u.admin_verified AS seller_admin_verified`;
 function rolloutBucket(value:string){return createHash('sha256').update(value).digest().readUInt32BE(0)%100}
-function secret(){const value=process.env.CURSOR_SIGNING_SECRET||'';if(value.length>=16)return value;if(process.env.NODE_ENV==='production')throw new Error('生产环境必须配置 CURSOR_SIGNING_SECRET（至少 16 字符）');return'development-cursor-secret-change-me'}
+function secret(){return runtimeSecret('cursor')}
 export function recommendationAssignment(identity:string){return process.env.RECOMMENDATION_ENABLED==='true'&&rolloutBucket(identity)<Math.max(0,Math.min(100,Number(process.env.RECOMMENDATION_ROLLOUT_PERCENT)||0));}
 export class RecommendationInputError extends Error{}
 
