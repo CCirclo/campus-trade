@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "concurrently -k -n api,web -c blue,green \"tsx watch backend/server/bootstrap.ts\" \"vite frontend --config frontend/vite.config.ts\"",
     "start": "tsx backend/server/bootstrap.ts",
+    "grant": "tsx backend/server/grant.ts",
     "typecheck": "tsc -p backend/tsconfig.json && tsc -p frontend/tsconfig.json --noEmit",
     "build": "npm run typecheck && vite build frontend --config frontend/vite.config.ts",
     "test": "node --import tsx --test backend/test/*.test.ts",

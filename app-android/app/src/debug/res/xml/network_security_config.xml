@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- debug 构建允许明文 HTTP,便于模拟器(10.0.2.2)与真机(局域网 IP)调试。 -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

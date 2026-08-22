@@ -216,12 +216,34 @@
 | GET | `/api/me/items` | 我发布的商品 | 登录 |
 | GET | `/api/me/favorites` | 我收藏的商品 | 登录 |
 | GET | `/api/me/stats` | 我的统计 | 登录 |
+| GET | `/api/me/wallet` | 我的钱包（奖励余额与流水） | 登录 |
 | PUT | `/api/me/profile` | 更新个人资料 | 登录 |
 | POST | `/api/me/avatar` | 上传头像（multipart） | 登录 |
 
 ### GET `/api/me/stats`
 
 响应：`{ "stats": { "total": 3, "selling": 2, "sold": 1 } }`
+
+### GET `/api/me/wallet`
+
+奖励由管理员手动发放，用户端只读。
+
+响应：
+
+```json
+{
+  "wallet": {
+    "originium": { "code": "originium", "name": "至纯源石", "description": "开发贡献凭证 · 或参与治理与分红", "balance": 10 },
+    "lungmen": { "code": "lungmen", "name": "龙门币", "description": "通用货币 · 可兑换商品与抽奖", "balance": 200 }
+  },
+  "entries": [
+    { "id": 1, "currency": "lungmen", "amount": 100, "balanceAfter": 200, "reason": "社区贡献奖励", "operator": "管理员", "createdAt": "2026-08-20T08:00:00.000Z" }
+  ]
+}
+```
+
+- `entries` 为最近 50 条发放流水。
+- 管理员发放:`npm run grant -- <邮箱> <币种> <数量> <原因> [--yes]`;查询:`npm run grant -- --list <邮箱>`。
 
 ### PUT `/api/me/profile`
 
