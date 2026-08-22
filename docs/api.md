@@ -118,13 +118,31 @@
 
 | 参数 | 说明 |
 | --- | --- |
-| `keyword` | 标题/描述关键词（≤40 字符） |
+| `keyword` | 标题/类目/描述关键词（≤40 字符） |
 | `category` | 分类 |
 | `condition` | 成色 |
 | `schoolId` | 学校（默认 `ruc_suzhou`） |
 | `sort` | `latest`（默认）/ `priceAsc` / `priceDesc` |
+| `page` | 页码，从 1 开始（默认 1；`(page - 1) × pageSize` 不得超过 10,000） |
+| `pageSize` | 每页数量（默认 20，最大 100） |
 
-响应：`{ "items": [ Item... ], "total": n }`（最多 100 条）
+关键词会先归一化并扩展已配置的校园简称。**多个查询词之间是 AND 关系**：例如 `iphone 15` 必须同时命中 `iphone` 与 `15`；每个查询词的别名变体（如 高数 ↔ 高等数学）是组内 OR 替代。含数字/型号/版本的词使用非数字边界匹配，`15` 不会误命中 `150` 或 `2015`。默认排序按标题、类目、描述的加权相关度，再按发布时间和商品 ID 稳定排序。显式价格排序仍优先按价格排序。
+
+响应：`{ "items": [ Item... ], "total": n, "page": 1, "pageSize": 20, "hasMore": false, "requestId": "...", "algorithmVersion": "keyword-v1" }`。`total` 是全部匹配商品数（混合召回启用时为有界候选池数量），`page`/`pageSize` 回显本次分页参数，`hasMore` 表示是否存在下一页。非法分页参数返回 HTTP 400。
+
+搜索实现、AND 语义与离线评测见 [`search.md`](search.md)。
+
+### GET `/api/recommendations`
+
+参数：`schoolId`、必填 UUID `sessionId`、可选签名 `cursor`、`pageSize`（1–50）。返回 `items`、`requestId`、`algorithmVersion`、`nextCursor`、`previousCursor` 和 `hasMore`。推荐关闭或未进入灰度时返回最新发布结果，结构保持一致。
+
+### POST `/api/events/batch`
+
+一次写入 1–50 条搜索、曝光、点击或转化事件。公共字段为 UUID 格式的 `eventId/requestId/sessionId`、`type/source`、`occurredAt` 和 `algorithmVersion`；商品事件包含 `itemId`，曝光/点击包含 1–500 的 `position`。服务端忽略客户端用户 ID，搜索原文不会落库。成功接收返回 HTTP 202；写入失败不影响浏览请求。
+
+### GET `/api/admin/analytics/recommendations`
+
+管理员接口。可选 `days=1..90`，返回按来源和算法版本聚合的 CTR、收藏率、会话发起率与商品覆盖。
 
 ### GET `/api/items/:id`
 
@@ -154,13 +172,13 @@
 ```
 
 - `images` 最多 9 张
-- 响应 `201`：`{ "id": 1 }`
+- 响应 `201`：`{ "id": 1, "embeddingStatus": "pending|ready|disabled|missing" }`。向量任务只需持久化入队即返回，不等待模型推理。
 
 ### PATCH `/api/items/:id`
 
 请求体同 POST，另可传 `status`（`在售`/`已售出`/`已下架`）。
 
-响应：`{ "ok": true }`
+响应：`{ "ok": true, "embeddingStatus": "pending|ready|disabled|missing" }`
 
 ### POST `/api/items/:id/favorite`
 

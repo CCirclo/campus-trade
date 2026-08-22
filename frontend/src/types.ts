@@ -1,7 +1,7 @@
 export type User = { id:number; email:string; nickname:string; avatarUrl:string; schoolId:string; wechatId:string; verified:boolean; campusVerified:boolean; adminVerified:boolean; emailMessageNotifications:boolean; role:'user'|'admin' };
 export type Seller = { id:number; nickname:string; avatarUrl:string; verified:boolean };
 export type PublicProfile = { id:number; nickname:string; avatarUrl:string; campusVerified:boolean };
-export type Item = { id:number; userId:number; title:string; price:number; images:string[]; category:string; condition:string; description:string; schoolId:string; status:string; createdAt:string; updatedAt:string; seller?:Seller };
+export type Item = { id:number; userId:number; title:string; price:number; images:string[]; category:string; condition:string; description:string; schoolId:string; status:string; createdAt:string; updatedAt:string; seller?:Seller; recommendationReasons?:string[] };
 export type Comment = { id:number; content:string; createdAt:string; author:Seller & { isSeller:boolean } };
 export type Conversation = { id:number; itemId:number; itemTitle:string; partner:{nickname:string;avatarUrl:string}; lastMessage:string; unreadCount:number; updatedAt:string };
 export type ItemCardSnapshot = { id:number; title:string; price:number; image:string; condition:string; status:string };

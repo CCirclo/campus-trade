@@ -63,6 +63,11 @@ export async function initDatabase() {
       CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       INDEX idx_sessions_expiry (expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS runtime_secrets (
+      secret_name VARCHAR(32) NOT NULL PRIMARY KEY,
+      secret_value CHAR(64) NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     `CREATE TABLE IF NOT EXISTS items (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
       user_id BIGINT UNSIGNED NOT NULL,
@@ -78,6 +83,44 @@ export async function initDatabase() {
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       CONSTRAINT fk_items_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       INDEX idx_items_school_status (school_id, status, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS item_embeddings (
+      item_id BIGINT UNSIGNED NOT NULL,
+      model_name VARCHAR(120) NOT NULL,
+      model_version VARCHAR(64) NOT NULL,
+      dimensions SMALLINT UNSIGNED NOT NULL,
+      normalized TINYINT(1) NOT NULL DEFAULT 1,
+      content_hash CHAR(64) NOT NULL,
+      embedding JSON NULL,
+      status VARCHAR(16) NOT NULL DEFAULT 'pending',
+      retry_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
+      next_retry_at TIMESTAMP NULL,
+      last_error VARCHAR(255) NOT NULL DEFAULT '',
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (item_id,model_version),
+      CONSTRAINT fk_item_embeddings_item FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+      INDEX idx_item_embeddings_queue (model_version,status,next_retry_at,updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS behavior_events (
+      event_id CHAR(36) NOT NULL PRIMARY KEY,
+      request_id CHAR(36) NOT NULL,
+      session_id CHAR(36) NOT NULL,
+      user_id BIGINT UNSIGNED NULL,
+      event_type VARCHAR(32) NOT NULL,
+      source VARCHAR(20) NOT NULL,
+      item_id BIGINT UNSIGNED NULL,
+      query_hash CHAR(64) NULL,
+      position SMALLINT UNSIGNED NULL,
+      algorithm_version VARCHAR(64) NOT NULL,
+      occurred_at TIMESTAMP(3) NOT NULL,
+      received_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      CONSTRAINT fk_behavior_events_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+      CONSTRAINT fk_behavior_events_item FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
+      INDEX idx_behavior_request (request_id,event_type),
+      INDEX idx_behavior_metrics (source,algorithm_version,event_type,occurred_at),
+      INDEX idx_behavior_user (user_id,occurred_at),
+      INDEX idx_behavior_item (item_id,occurred_at)
+      ,INDEX idx_behavior_retention (received_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     `CREATE TABLE IF NOT EXISTS favorites (
       user_id BIGINT UNSIGNED NOT NULL,
@@ -183,6 +226,7 @@ export async function initDatabase() {
   await migrateAdminColumns();
   if(!await columnExists('email_codes','purpose'))await pool.query(`ALTER TABLE email_codes ADD COLUMN purpose VARCHAR(20) NOT NULL DEFAULT 'register' AFTER attempts`);
   await migrateConversations();
+  await run('DELETE FROM behavior_events WHERE received_at<DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 90 DAY)');
   await promoteAdminsFromEnv();
   if (process.env.SEED_DEMO_DATA === 'true') await seedDemoData();
 }

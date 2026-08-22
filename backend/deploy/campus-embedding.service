@@ -1,0 +1,21 @@
+[Unit]
+Description=Campus Market local BGE embedding service
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=600
+TimeoutStopSec=30
+MemoryHigh=640M
+MemoryMax=768M
+TasksMax=256
+ExecStartPre=-/usr/bin/docker rm -f campus-embedding
+ExecStart=/usr/bin/docker run --rm --name campus-embedding --memory=704m --memory-swap=704m --cpus=1 --pids-limit=192 -p 127.0.0.1:8080:80 -v /srv/campus-embedding:/data ghcr.io/huggingface/text-embeddings-inference:cpu-1.9 --model-id BAAI/bge-small-zh-v1.5
+ExecStop=/usr/bin/docker stop -t 20 campus-embedding
+
+[Install]
+WantedBy=multi-user.target

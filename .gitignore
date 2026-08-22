@@ -28,3 +28,6 @@ local.properties
 .proxyai/
 *.apk
 *.aab
+
+# 本地 AI 辅助开发审计记录
+.codex-copilot-history/

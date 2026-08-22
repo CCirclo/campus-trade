@@ -2,6 +2,7 @@ import { type NextFunction, type Response, Router } from 'express';
 import { hashPassword, type AuthedRequest } from './auth.js';
 import { all, mapItem, one, pool, run, type DbRow } from './db.js';
 import { cleanText, isCampusEmail, normalizeEmail, statuses, validEmail } from './security.js';
+import {behaviorMetrics} from './events-store.js';
 
 export const adminRouter = Router();
 export const REPORT_REASONS = ['虚假信息', '违规内容', '诈骗风险', '重复发布', '其他'] as const;
@@ -59,6 +60,8 @@ adminRouter.get('/stats', async (_req, res) => {
     reports: Number(reportRows[0]?.total || 0), reportsPending: Number(pendingRows[0]?.total || 0),
   });
 });
+
+adminRouter.get('/analytics/recommendations',async(req,res)=>{res.json({days:Math.max(1,Math.min(90,Number(req.query.days)||7)),metrics:await behaviorMetrics(Number(req.query.days)||7)})});
 
 // ---------- 用户管理 ----------
 adminRouter.get('/users', async (req, res) => {

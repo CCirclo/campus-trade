@@ -148,3 +148,13 @@
 .admin-report-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap}
 @media (min-width:700px){.admin-header{height:64px;padding:0 24px}.admin-main{padding:30px 28px 70px}.admin-stat-grid{grid-template-columns:repeat(4,1fr)}.admin-nav a{padding:10px 16px}}
 @media (min-width:700px){.admin-title-row{align-items:center}}
+
+/* 首页搜索结果分页 */
+.pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin:24px 0 6px;flex-wrap:wrap}
+.pagination-button{display:inline-flex;min-height:42px;align-items:center;justify-content:center;gap:6px;padding:0 16px;border:1px solid var(--line);border-radius:12px;background:#fff;color:#4c5665;font-size:12px;font-weight:750;transition:transform 150ms var(--ease-out),border-color 150ms ease,color 150ms ease}
+.pagination-button:hover:not(:disabled){border-color:#b9c9e3;color:var(--brand)}
+.pagination-button:active:not(:disabled){transform:scale(.97)}
+.pagination-button:disabled{opacity:.45;cursor:not-allowed}
+.pagination-button svg{width:16px}
+.pagination-info{color:var(--muted);font-size:12px}
+@media (min-width:700px){.pagination{gap:18px}}
