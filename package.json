@@ -9,7 +9,10 @@
     "typecheck": "tsc -p backend/tsconfig.json && tsc -p frontend/tsconfig.json --noEmit",
     "build": "npm run typecheck && vite build frontend --config frontend/vite.config.ts",
     "test": "node --import tsx --test backend/test/*.test.ts",
-    "search:evaluate": "node --import tsx backend/scripts/evaluate-search.ts"
+    "search:evaluate": "node --import tsx backend/scripts/evaluate-search.ts",
+    "search:evaluate-hybrid": "node --import tsx backend/scripts/evaluate-hybrid-search.ts",
+    "embeddings:rebuild": "node --import tsx backend/scripts/rebuild-embeddings.ts",
+    "recommendation:evaluate": "node --import tsx backend/scripts/evaluate-recommendations.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

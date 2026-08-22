@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+release_root=${1:-/srv/campus-market/current}
+env_file=/etc/campus-market/.env
+unit_source="$release_root/backend/deploy/campus-embedding.service"
+
+[[ $EUID -eq 0 ]] || { echo "must run as root" >&2; exit 2; }
+[[ -f $unit_source && -f $env_file ]] || { echo "release or environment file missing" >&2; exit 2; }
+command -v docker >/dev/null || { echo "docker is required" >&2; exit 2; }
+available_kb=$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)
+[[ ${available_kb:-0} -ge 1572864 ]] || { echo "at least 1.5 GiB available memory is required before installation" >&2; exit 3; }
+env_backup=$(mktemp)
+cp "$env_file" "$env_backup"
+rollback(){ cp "$env_backup" "$env_file"; systemctl restart campus-market-web.service || true; rm -f "$env_backup"; }
+trap rollback ERR
+
+set_env(){
+  local key=$1 value=$2
+  if grep -q "^${key}=" "$env_file"; then sed -i "s|^${key}=.*|${key}=${value}|" "$env_file"; else printf '%s=%s\n' "$key" "$value" >> "$env_file"; fi
+}
+
+install -d -o root -g root -m 755 /srv/campus-embedding
+install -o root -g root -m 644 "$unit_source" /etc/systemd/system/campus-embedding.service
+install -o root -g root -m 644 "$release_root/backend/deploy/campus-market-web.service" /etc/systemd/system/campus-market-web.service
+docker pull ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+systemctl daemon-reload
+systemctl enable --now campus-embedding.service
+
+for _ in $(seq 1 60); do
+  if curl -fsS --max-time 2 http://127.0.0.1:8080/health >/dev/null; then break; fi
+  sleep 2
+done
+curl -fsS --max-time 3 http://127.0.0.1:8080/health >/dev/null
+
+set_env EMBEDDING_ENABLED true
+set_env HYBRID_SEARCH_ENABLED true
+set_env EMBEDDING_API_URL http://127.0.0.1:8080/v1/embeddings
+set_env EMBEDDING_MODEL BAAI/bge-small-zh-v1.5
+set_env EMBEDDING_MODEL_VERSION bge-small-zh-v1.5@1
+set_env EMBEDDING_DIMENSIONS 512
+set_env EMBEDDING_BATCH_SIZE 1
+set_env EMBEDDING_MAX_PENDING 8
+set_env EMBEDDING_VECTOR_SCAN_LIMIT 500
+set_env HYBRID_SPARSE_RESULT_THRESHOLD 12
+systemctl restart campus-market-web.service
+curl -fsS --retry 15 --retry-connrefused --retry-delay 1 --max-time 3 http://127.0.0.1:8787/api/health >/dev/null
+rm -f "$env_backup"
+trap - ERR
+echo "local embedding service installed and hybrid search enabled"
