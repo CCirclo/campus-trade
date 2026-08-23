@@ -35,7 +35,7 @@ test('conversations are unique per pair and repeated item cards are skipped',()=
   assert.equal(shouldSendItemCard(18,18),false);
   assert.equal(shouldSendItemCard(17,18),true);
   assert.equal(shouldSendItemCard(17,18,true),false);
-  assert.deepEqual(itemCardSnapshot({id:18,title:'教材',price:20,images:'["cover.jpg"]',item_condition:'九成新',status:'在售'}),{id:18,title:'教材',price:20,image:'cover.jpg',condition:'九成新',status:'在售'});
+  assert.deepEqual(itemCardSnapshot({id:18,title:'教材',price:20,images:'["cover.jpg"]',item_condition:'九成新',status:'在售'}),{id:18,title:'教材',price:20,currency:'cny',rmbPrice:null,image:'cover.jpg',condition:'九成新',status:'在售'});
 });
 
 test('new message email is branded and escapes user content',()=>{

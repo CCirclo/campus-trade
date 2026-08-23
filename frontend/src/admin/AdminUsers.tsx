@@ -64,7 +64,7 @@ export default function AdminUsers() {
             users.map(u => <tr key={u.id}>
               <td><div className="admin-cell-user"><img src={u.avatarUrl || fallbackAvatar} alt="" /><span><b>{u.nickname}</b><small>{u.email}</small></span></div></td>
               <td><span className={`admin-pill ${u.role === 'admin' ? 'admin' : 'user'}`}>{u.role === 'admin' ? '管理员' : '用户'}</span></td>
-              <td><span className={`admin-pill ${authBadge(u).cls}`} title={authBadge(u).title}>{authBadge(u).text}</span></td>
+              <td><span className={`admin-pill ${authBadge(u).cls}`} title={authBadge(u).title}>{authBadge(u).text}</span>{u.selfOperated && <span className="admin-pill self">自营</span>}</td>
               <td>{u.itemCount}</td>
               <td className="admin-muted">{formatTimestamp(u.createdAt)}</td>
               <td><div className="admin-row-actions"><button className="admin-icon-btn" title="编辑" onClick={() => setEditor({ mode: 'edit', user: u })}><Pencil /></button><button className="admin-icon-btn danger" title="删除" onClick={() => void remove(u)}><Trash2 /></button></div></td>
@@ -83,14 +83,15 @@ function UserEditor({ mode, user, onClose, onSaved, onError }: { mode: 'create' 
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [role, setRole] = useState<'user' | 'admin'>(user?.role || 'user');
   const [adminVerified, setAdminVerified] = useState(user?.adminVerified || false);
+  const [selfOperated, setSelfOperated] = useState(user?.selfOperated || false);
   const [busy, setBusy] = useState(false);
   const emailNow = (mode === 'edit' && user ? user.email : email).trim().toLowerCase();
   const effective = adminVerified || emailNow.endsWith('@ruc.edu.cn');
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true);
     try {
-      if (mode === 'create') await post('/api/admin/users', { email, password, nickname, role, adminVerified });
-      else await api(`/api/admin/users/${user!.id}`, { method: 'PATCH', body: JSON.stringify({ nickname, role, adminVerified }) });
+      if (mode === 'create') await post('/api/admin/users', { email, password, nickname, role, adminVerified, selfOperated });
+      else await api(`/api/admin/users/${user!.id}`, { method: 'PATCH', body: JSON.stringify({ nickname, role, adminVerified, selfOperated }) });
       onSaved();
     } catch (e) { onError(e instanceof Error ? e.message : '保存失败'); } finally { setBusy(false); }
   };
@@ -104,6 +105,7 @@ function UserEditor({ mode, user, onClose, onSaved, onError }: { mode: 'create' 
       <label>昵称<input value={nickname} onChange={e => setNickname(e.target.value)} required minLength={2} maxLength={24} /></label>
       <label>角色<select value={role} onChange={e => setRole(e.target.value as 'user' | 'admin')}><option value="user">普通用户</option><option value="admin">管理员</option></select></label>
       <label className="admin-check"><input type="checkbox" checked={adminVerified} onChange={e => setAdminVerified(e.target.checked)} /><span><b>管理员手动认证</b><small>勾选后该用户获得发布、评论、发消息等认证权限，可随时取消；@ruc.edu.cn 校园邮箱用户默认已认证。</small></span></label>
+      <label className="admin-check"><input type="checkbox" checked={selfOperated} onChange={e => setSelfOperated(e.target.checked)} /><span><b>自营账号</b><small>勾选后该用户可发布「原石」计价的兑换商品；取消后只能以人民币发布。</small></span></label>
       {effective && <div className="admin-cert-note ok">✓ 该用户将显示为<b>已认证</b>，可正常发布与交易</div>}
       {!effective && <div className="admin-cert-note warn">未认证：该邮箱不是 @ruc.edu.cn 校园邮箱，需勾选「管理员手动认证」后才会获得认证权限</div>}
     </div>

@@ -1,12 +1,13 @@
 import 'dotenv/config';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { all, one, pool } from './db.js';
+import { all, one } from './db.js';
 import { CURRENCIES, MAX_GRANT_AMOUNT, parseCurrency, validAmount, type CurrencyCode } from './currency.js';
 import { cleanText, normalizeEmail } from './security.js';
+import { grantCurrency } from './wallet.js';
 
 const USAGE = `用法:
-  npm run grant -- <邮箱> <币种> <数量> <原因> [--yes]   手动发放奖励（币种: originium/至纯源石、lungmen/龙门币）
+  npm run grant -- <邮箱> <币种> <数量> <原因> [--yes]   手动发放奖励（币种: lungmen/原石、originium/创世结晶）
   npm run grant -- --list <邮箱>                         查询某用户的余额与最近流水`;
 
 function fail(message: string): void { console.error(message); process.exitCode = 1; }
@@ -30,7 +31,7 @@ async function listBalances(email: string) {
     console.log('最近流水:');
     for (const e of ledgerRows) {
       const def = CURRENCIES[String(e.currency) as CurrencyCode];
-      console.log(`  +${e.amount} ${def ? def.name : String(e.currency)} | ${String(e.reason)} | 余额 ${e.balance_after} | ${String(e.operator)} | ${fmtTime(e.created_at)}`);
+      console.log(`  ${Number(e.amount)>0?'+':''}${e.amount} ${def ? def.name : String(e.currency)} | ${String(e.reason)} | 余额 ${e.balance_after} | ${String(e.operator)} | ${fmtTime(e.created_at)}`);
     }
   } else {
     console.log('  暂无流水记录');
@@ -52,7 +53,7 @@ async function grant() {
   const amount = validAmount(amountArg);
   const reason = cleanText(reasonParts.join(' '), 200);
   if (!email || !currency || amount === null || reason.length < 2) {
-    return fail(`${USAGE}\n要求: 有效邮箱、币种(originium/至纯源石、lungmen/龙门币)、1–${MAX_GRANT_AMOUNT} 的正整数、至少 2 个字符的原因`);
+    return fail(`${USAGE}\n要求: 有效邮箱、币种(lungmen/原石、originium/创世结晶)、1–${MAX_GRANT_AMOUNT} 的正整数、至少 2 个字符的原因`);
   }
 
   const user = await one('SELECT id,email,nickname FROM users WHERE email=?', [email]);
@@ -60,11 +61,11 @@ async function grant() {
 
   const walletRow = await one('SELECT balance FROM wallets WHERE user_id=? AND currency=?', [Number(user.id), currency]);
   const before = Number(walletRow?.balance || 0);
-  const after = before + amount;
+  const previewAfter = before + amount;
   const def = CURRENCIES[currency];
   console.log(`即将发放: ${def.name} × ${amount}`);
   console.log(`目标用户: ${String(user.nickname)} (${String(user.email)})`);
-  console.log(`余额变化: ${before} → ${after}`);
+  console.log(`余额变化: ${before} → ${previewAfter}`);
   console.log(`发放原因: ${reason}`);
 
   if (!yes) {
@@ -75,24 +76,8 @@ async function grant() {
   }
 
   const operator = cleanText(process.env.ADMIN_OPERATOR_NAME || '管理员', 160);
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-    // 先确保钱包行存在,再在事务内锁定该行读取余额并计算,避免并发发放产生错误账本
-    await connection.execute('INSERT INTO wallets (user_id,currency,balance) VALUES (?,?,0) ON DUPLICATE KEY UPDATE balance=balance', [Number(user.id), currency]);
-    const [locked] = await connection.execute<any[]>('SELECT balance FROM wallets WHERE user_id=? AND currency=? FOR UPDATE', [Number(user.id), currency]);
-    const lockedBefore = Number(locked[0]?.balance || 0);
-    const lockedAfter = lockedBefore + amount;
-    await connection.execute('UPDATE wallets SET balance=? WHERE user_id=? AND currency=?', [lockedAfter, Number(user.id), currency]);
-    await connection.execute('INSERT INTO currency_ledger (user_id,currency,amount,balance_after,reason,operator) VALUES (?,?,?,?,?,?)', [Number(user.id), currency, amount, lockedAfter, reason, operator]);
-    await connection.commit();
-    console.log(`发放成功: ${String(user.nickname)} +${amount} ${def.name}，当前余额 ${lockedAfter}（操作者: ${operator}）`);
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
+  const { after } = await grantCurrency({ userId: Number(user.id), currency, amount, reason, operator });
+  console.log(`发放成功: ${String(user.nickname)} +${amount} ${def.name}，当前余额 ${after}（操作者: ${operator}）`);
 }
 
 grant().catch(error => { console.error('发放失败:', error); process.exitCode = 1; });

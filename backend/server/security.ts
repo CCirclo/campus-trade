@@ -66,6 +66,9 @@ export function consumeRateLimit(key: string, limit = 8, windowMs = 10 * 60_000)
 }
 
 export const categories = ['教材', '电子产品', '生活用品', '服饰', '运动器材', '其他'] as const;
+export const regions = ['苏州区', '北京区'] as const;
+export const kinds = ['商品', '贴图'] as const;
+export const easterEggs = ['猫'] as const;
 export const conditions = ['全新', '九成新', '七成新', '五成新及以下'] as const;
 export const statuses = ['在售', '已售出', '已下架'] as const;
 

@@ -3,9 +3,12 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ExternalLink, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { api } from '../api';
 import { formatTimestamp } from '../time';
+import { formatItemPrice, formatItemPrices } from '../currency';
 import type { Item } from '../types';
 
 const statuses = ['在售', '已售出', '已下架'];
+const kinds = ['商品', '贴图'];
+const eggOptions = ['猫'];
 const pageSize = 20;
 
 export default function AdminItems() {
@@ -35,6 +38,14 @@ export default function AdminItems() {
     try { await api(`/api/admin/items/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status: next }) }); load(); }
     catch (e) { setError(e instanceof Error ? e.message : '更新失败'); }
   };
+  const changeKind = async (item: Item, next: string) => {
+    try { await api(`/api/admin/items/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status: item.status, kind: next }) }); load(); }
+    catch (e) { setError(e instanceof Error ? e.message : '更新失败'); }
+  };
+  const changeEgg = async (item: Item, next: string) => {
+    try { await api(`/api/admin/items/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status: item.status, easterEgg: next || null }) }); load(); }
+    catch (e) { setError(e instanceof Error ? e.message : '更新失败'); }
+  };
   const remove = async (item: Item) => {
     if (!window.confirm(`确定删除商品「${item.title}」？删除后无法恢复。`)) return;
     try { await api(`/api/admin/items/${item.id}`, { method: 'DELETE' }); load(); }
@@ -54,15 +65,17 @@ export default function AdminItems() {
     {error && <div className="form-error">{error}</div>}
     <div className="admin-table-wrap">
       <table className="admin-table">
-        <thead><tr><th>商品</th><th>卖家</th><th>价格</th><th>状态</th><th>发布时间</th><th>操作</th></tr></thead>
+        <thead><tr><th>商品</th><th>卖家</th><th>价格</th><th>状态</th><th>性质</th><th>彩蛋</th><th>发布时间</th><th>操作</th></tr></thead>
         <tbody>
-          {loading ? <tr><td colSpan={6} className="admin-table-empty">加载中…</td></tr> :
-            !items.length ? <tr><td colSpan={6} className="admin-table-empty">没有找到符合条件的商品</td></tr> :
+          {loading ? <tr><td colSpan={8} className="admin-table-empty">加载中…</td></tr> :
+            !items.length ? <tr><td colSpan={8} className="admin-table-empty">没有找到符合条件的商品</td></tr> :
             items.map(item => <tr key={item.id}>
               <td><div className="admin-cell-item"><img src={item.images[0] || ''} alt="" /><span><b>{item.title}</b><small>{item.category} · {item.condition}</small></span></div></td>
               <td><div className="admin-cell-user"><span><b>{item.seller?.nickname || '未知'}</b><small>#{item.userId}</small></span></div></td>
-              <td><strong className="admin-price">¥{item.price}</strong></td>
+              <td><strong className={`admin-price${item.kind === '贴图' ? ' pic-price' : ''}`}>{item.kind === '贴图' ? item.price : formatItemPrices(item)}</strong></td>
               <td><select className={`admin-status-select ${item.status === '在售' ? 'selling' : item.status === '已售出' ? 'sold' : 'off'}`} value={item.status} onChange={e => void changeStatus(item, e.target.value)}>{statuses.map(s => <option key={s}>{s}</option>)}</select></td>
+              <td><select className={`admin-status-select ${item.kind === '贴图' ? 'off' : ''}`} value={item.kind || '商品'} onChange={e => void changeKind(item, e.target.value)}>{kinds.map(k => <option key={k}>{k}</option>)}</select></td>
+              <td><select className={`admin-status-select ${item.easterEgg ? 'selling' : ''}`} value={item.easterEgg || ''} onChange={e => void changeEgg(item, e.target.value)}><option value="">无彩蛋</option>{eggOptions.map(k => <option key={k} value={k}>🐱 {k}</option>)}</select></td>
               <td className="admin-muted">{formatTimestamp(item.createdAt)}</td>
               <td><div className="admin-row-actions"><Link className="admin-icon-btn" to={`/items/${item.id}`} target="_blank" rel="noreferrer" title="查看商品"><ExternalLink /></Link><button className="admin-icon-btn danger" title="删除" onClick={() => void remove(item)}><Trash2 /></button></div></td>
             </tr>)}

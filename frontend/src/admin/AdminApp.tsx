@@ -1,12 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Route, Routes } from 'react-router-dom';
-import { ArrowLeft, Flag, LayoutDashboard, LogOut, Package, ShieldCheck, Users } from 'lucide-react';
+import { ArrowLeft, Coins, Flag, LayoutDashboard, LogOut, Package, ShieldCheck, Users } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import type { AdminStats } from '../types';
 import AdminUsers from './AdminUsers';
 import AdminItems from './AdminItems';
 import AdminReports from './AdminReports';
+import AdminReward from './AdminReward';
 
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -46,6 +47,7 @@ export default function AdminApp() {
         <NavLink to="/admin/users"><Users />用户</NavLink>
         <NavLink to="/admin/items"><Package />商品</NavLink>
         <NavLink to="/admin/reports"><Flag />举报{stats && stats.reportsPending > 0 && <i>{stats.reportsPending}</i>}</NavLink>
+        <NavLink to="/admin/reward"><Coins />奖励设置</NavLink>
       </nav>
       <div className="admin-header-actions">
         <Link className="admin-back-link" to="/"><ArrowLeft />返回主站</Link>
@@ -59,6 +61,7 @@ export default function AdminApp() {
         <Route path="users" element={<AdminUsers />} />
         <Route path="items" element={<AdminItems />} />
         <Route path="reports" element={<AdminReports />} />
+        <Route path="reward" element={<AdminReward />} />
       </Routes>
     </main>
   </div>;

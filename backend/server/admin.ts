@@ -1,7 +1,10 @@
 import { type NextFunction, type Response, Router } from 'express';
 import { hashPassword, type AuthedRequest } from './auth.js';
 import { all, mapItem, one, pool, run, type DbRow } from './db.js';
-import { cleanText, isCampusEmail, normalizeEmail, statuses, validEmail } from './security.js';
+import { cleanText, easterEggs, isCampusEmail, kinds, normalizeEmail, statuses, validEmail } from './security.js';
+import { parseCurrency, validAmount } from './currency.js';
+import { getRewardSettings, parseRewardSettings, saveRewardSettings } from './settings.js';
+import { grantCurrency } from './wallet.js';
 import {behaviorMetrics} from './events-store.js';
 
 export const adminRouter = Router();
@@ -24,7 +27,7 @@ function mapAdminUser(row: DbRow) {
   return {
     id: Number(row.id), email: String(row.email || ''), nickname: String(row.nickname || ''),
     avatarUrl: String(row.avatar_url || ''), role: String(row.role || 'user') === 'admin' ? 'admin' as const : 'user' as const,
-    verified: Boolean(row.verified), emailVerified: Boolean(row.email_verified), adminVerified: Boolean(row.admin_verified),
+    verified: Boolean(row.verified), emailVerified: Boolean(row.email_verified), adminVerified: Boolean(row.admin_verified), selfOperated: Boolean(row.self_operated),
     campusVerified: Boolean(row.admin_verified) || (Boolean(row.email_verified) && isCampusEmail(row.email)),
     emailMessageNotifications: Boolean(row.email_message_notifications),
     createdAt: dateIso(row.created_at), lastSeenAt: row.last_seen_at ? dateIso(row.last_seen_at) : null,
@@ -77,14 +80,14 @@ adminRouter.get('/users', async (req, res) => {
 
 adminRouter.post('/users', async (req, res) => {
   const email = normalizeEmail(req.body.email), password = String(req.body.password || ''), nickname = cleanText(req.body.nickname, 24);
-  const adminVerified = Boolean(req.body.adminVerified), role = req.body.role === 'admin' ? 'admin' : 'user';
+  const adminVerified = Boolean(req.body.adminVerified), selfOperated = Boolean(req.body.selfOperated), role = req.body.role === 'admin' ? 'admin' : 'user';
   if (!validEmail(email)) return res.status(400).json({ error: '请输入有效邮箱地址' });
   if (password.length < 8 || password.length > 72) return res.status(400).json({ error: '密码需为 8–72 个字符' });
   if (nickname.length < 2) return res.status(400).json({ error: '昵称至少需要 2 个字符' });
   if (await one('SELECT id FROM users WHERE email=?', [email])) return res.status(409).json({ error: '该邮箱已存在' });
   const emailVerified = isCampusEmail(email) ? 1 : 0;
-  const result = await run(`INSERT INTO users (email,password_hash,nickname,school_id,verified,email_verified,admin_verified,role) VALUES (?,?,?,'ruc_suzhou',?,?,?,?)`,
-    [email, await hashPassword(password), nickname, adminVerified || emailVerified, emailVerified, adminVerified ? 1 : 0, role]);
+  const result = await run(`INSERT INTO users (email,password_hash,nickname,school_id,verified,email_verified,admin_verified,self_operated,role) VALUES (?,?,?,'ruc_suzhou',?,?,?,?,?)`,
+    [email, await hashPassword(password), nickname, adminVerified || emailVerified, emailVerified, adminVerified ? 1 : 0, selfOperated ? 1 : 0, role]);
   res.status(201).json({ user: await adminUser(Number(result.insertId)) });
 });
 
@@ -99,6 +102,7 @@ adminRouter.patch('/users/:id', async (req, res) => {
   if (req.body.verified !== undefined) { updates.push('verified=?'); args.push(req.body.verified ? 1 : 0); }
   if (req.body.emailVerified !== undefined) { updates.push('email_verified=?'); args.push(req.body.emailVerified ? 1 : 0); }
   if (req.body.adminVerified !== undefined) { updates.push('admin_verified=?'); args.push(req.body.adminVerified ? 1 : 0); }
+  if (req.body.selfOperated !== undefined) { updates.push('self_operated=?'); args.push(req.body.selfOperated ? 1 : 0); }
   if (req.body.emailMessageNotifications !== undefined) { updates.push('email_message_notifications=?'); args.push(req.body.emailMessageNotifications ? 1 : 0); }
   if (!updates.length) return res.status(400).json({ error: '没有需要更新的内容' });
   args.push(id);
@@ -127,9 +131,26 @@ adminRouter.get('/items', async (req, res) => {
 });
 
 adminRouter.patch('/items/:id', async (req, res) => {
-  const id = Number(req.params.id), status = cleanText(req.body.status, 20);
-  if (!statuses.includes(status as typeof statuses[number])) return res.status(400).json({ error: '商品状态无效' });
-  const result = await run('UPDATE items SET status=? WHERE id=?', [status, id]);
+  const id = Number(req.params.id);
+  const updates: string[] = [], args: unknown[] = [];
+  if (req.body.status !== undefined) {
+    const status = cleanText(req.body.status, 20);
+    if (!statuses.includes(status as typeof statuses[number])) return res.status(400).json({ error: '商品状态无效' });
+    updates.push('status=?'); args.push(status);
+  }
+  if (req.body.kind !== undefined) {
+    const kind = cleanText(req.body.kind, 10);
+    if (!(kinds as readonly string[]).includes(kind)) return res.status(400).json({ error: '商品性质无效' });
+    updates.push('kind=?'); args.push(kind);
+  }
+  if (req.body.easterEgg !== undefined) {
+    const egg = req.body.easterEgg === null || req.body.easterEgg === '' ? null : cleanText(req.body.easterEgg, 20);
+    if (egg !== null && !(easterEggs as readonly string[]).includes(egg)) return res.status(400).json({ error: '彩蛋种类无效' });
+    updates.push('easter_egg=?'); args.push(egg);
+  }
+  if (!updates.length) return res.status(400).json({ error: '没有需要更新的内容' });
+  args.push(id);
+  const result = await run(`UPDATE items SET ${updates.join(',')} WHERE id=?`, args);
   if (!result.affectedRows) return res.status(404).json({ error: '商品不存在' });
   res.json({ ok: true });
 });
@@ -161,4 +182,43 @@ adminRouter.patch('/reports/:id', async (req: AuthedRequest, res) => {
   if (!existing) return res.status(404).json({ error: '举报不存在' });
   await run('UPDATE reports SET status=?,handled_at=CURRENT_TIMESTAMP,handler_id=? WHERE id=?', [status, req.user!.id, id]);
   res.json({ ok: true });
+});
+
+// ---------- 奖励机制设置 ----------
+adminRouter.get('/settings/reward', async (_req, res) => {
+  res.json({ settings: await getRewardSettings() });
+});
+
+adminRouter.put('/settings/reward', async (req, res) => {
+  const settings = parseRewardSettings(req.body);
+  if (!settings) return res.status(400).json({ error: '奖励设置格式无效' });
+  await saveRewardSettings(settings);
+  res.json({ settings });
+});
+
+// ---------- 手动发放奖励 ----------
+adminRouter.post('/wallet/grant', async (req: AuthedRequest, res) => {
+  const email = normalizeEmail(req.body.email);
+  const currency = parseCurrency(req.body.currency);
+  const amount = validAmount(req.body.amount);
+  const reason = cleanText(req.body.reason, 200);
+  if (!email || !currency || amount === null || reason.length < 2) return res.status(400).json({ error: '请提供有效邮箱、币种、正整数数量和至少 2 个字符的原因' });
+  const user = await one('SELECT id,email,nickname FROM users WHERE email=?', [email]);
+  if (!user) return res.status(404).json({ error: '未找到该用户' });
+  const operator = String(req.user!.email || req.user!.nickname || '管理员');
+  const { after } = await grantCurrency({ userId: Number(user.id), currency, amount, reason, operator });
+  res.status(201).json({ userId: Number(user.id), currency, amount, balanceAfter: after });
+});
+
+adminRouter.get('/users/:id/wallet', async (req, res) => {
+  const id = Number(req.params.id);
+  const user = await one('SELECT id,email,nickname FROM users WHERE id=?', [id]);
+  if (!user) return res.status(404).json({ error: '用户不存在' });
+  const balances = await all('SELECT currency,balance FROM wallets WHERE user_id=?', [id]);
+  const entries = await all('SELECT id,currency,amount,balance_after,reason,operator,created_at FROM currency_ledger WHERE user_id=? ORDER BY id DESC LIMIT 50', [id]);
+  res.json({
+    user: { id: Number(user.id), email: String(user.email), nickname: String(user.nickname) },
+    balances: balances.map(b => ({ currency: String(b.currency), balance: Number(b.balance) })),
+    entries: entries.map(e => ({ id: Number(e.id), currency: String(e.currency), amount: Number(e.amount), balanceAfter: Number(e.balance_after), reason: String(e.reason), operator: String(e.operator), createdAt: dateIso(e.created_at) })),
+  });
 });
