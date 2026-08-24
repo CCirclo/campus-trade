@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, CircleUserRound, Coins, Edit3, Heart, Home,
-  ImagePlus, Laptop, LifeBuoy, LogOut, Menu, MessageCircle, Package, Plus, Search,
+  ArrowLeft, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, ChevronsUpDown, CircleUserRound, Coins, Edit3, Heart, Home,
+  ImagePlus, Laptop, LifeBuoy, LogOut, MapPin, Menu, MessageCircle, Package, Plus, Search,
   Send, ShieldCheck, ShoppingBag, SlidersHorizontal, Sparkles, Upload, UserRound, X,
 } from 'lucide-react';
 import { api, ApiError, post } from './api';
@@ -35,8 +35,10 @@ function Toast({message,onClose}:{message:string;onClose:()=>void}){
 }
 
 function Shell({children}:{children:ReactNode}){
-  const {user,logout,schools,defaultScope}=useAuth(); const [menu,setMenu]=useState(false),[unread,setUnread]=useState(0); const location=useLocation();
+  const {user,logout,schools,defaultScope,refresh}=useAuth(); const [menu,setMenu]=useState(false),[unread,setUnread]=useState(0),[switchingCampus,setSwitchingCampus]=useState(false); const location=useLocation();
   const fallbackSchool=schools.find(s=>s.id===defaultScope?.schoolId),fallbackCampus=fallbackSchool?.campuses.find(c=>c.id===defaultScope?.campusId),scopeName=user?`${user.schoolName} · ${user.campusName}`:`${fallbackSchool?.name||'校园'} · ${fallbackCampus?.name||'校区'}`;
+  const currentSchool=schools.find(s=>s.id===user?.schoolId);
+  const switchCampus=async(campusId:string)=>{if(!user||campusId===user.campusId)return;setSwitchingCampus(true);try{await api('/api/me/profile',{method:'PUT',body:JSON.stringify({nickname:user.nickname,wechatId:user.wechatId,campusId,emailMessageNotifications:user.emailMessageNotifications})});await refresh()}catch(error){window.alert(error instanceof Error?error.message:'校区切换失败，请稍后再试')}finally{setSwitchingCampus(false)}};
   useEffect(()=>setMenu(false),[location.pathname]);
   useEffect(()=>{if(!user){setUnread(0);return}const refresh=()=>void api<{count:number}>('/api/conversations/unread-count').then(d=>setUnread(d.count)).catch(()=>{});refresh();const timer=setInterval(refresh,10_000);window.addEventListener('campus-unread-changed',refresh);return()=>{clearInterval(timer);window.removeEventListener('campus-unread-changed',refresh)}},[user?.id]);
   return <div className="app-shell">
@@ -45,7 +47,7 @@ function Shell({children}:{children:ReactNode}){
       <nav className="desktop-nav" aria-label="主要导航">
         <NavLink to="/" end><Home/>首页</NavLink><NavLink to="/publish"><Plus/>发布</NavLink><NavLink to="/messages"><span className="nav-icon-badge"><MessageCircle/>{unread>0&&<i>{unread>99?'99+':unread}</i>}</span>消息</NavLink><NavLink to="/feedback"><LifeBuoy/>反馈</NavLink><NavLink to="/mine"><CircleUserRound/>我的</NavLink>
       </nav>
-      <div className="header-actions"><span className="school-chip">{scopeName}</span>{user?<Link className="user-chip" to="/mine"><img src={avatar(user.avatarUrl)} alt=""/><span>{user.nickname}</span></Link>:<Link className="button primary compact" to="/login">登录</Link>}<button className="icon-button menu-button" onClick={()=>setMenu(v=>!v)} aria-label="打开菜单"><Menu/></button></div>
+      <div className="header-actions">{user&&currentSchool?.campuses.length?<label className={`campus-switcher${switchingCampus?' busy':''}`} title="切换当前浏览和发布校区"><MapPin className="campus-pin"/><span>{user.schoolName} ·</span><select value={user.campusId} onChange={e=>void switchCampus(e.target.value)} disabled={switchingCampus} aria-label="切换校区">{currentSchool.campuses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><ChevronsUpDown className="switch-cue" aria-hidden="true"/></label>:<span className="school-chip">{scopeName}</span>}{user?<Link className="user-chip" to="/mine"><img src={avatar(user.avatarUrl)} alt=""/><span>{user.nickname}</span></Link>:<Link className="button primary compact" to="/login">登录</Link>}<button className="icon-button menu-button" onClick={()=>setMenu(v=>!v)} aria-label="打开菜单"><Menu/></button></div>
     </div>{menu&&<div className="mobile-menu"><Link to="/safety">安全交易指南</Link><Link to="/feedback"><LifeBuoy size={17}/>问题反馈与建议</Link>{user&&<button onClick={()=>void logout()}><LogOut size={17}/>退出登录</button>}</div>}</header>
     {user&&!user.campusVerified&&<div className="campus-warning"><ShieldCheck/><span><b>你不是校园认证用户，当前只能查看。</b><small>只有通过平台已配置学校邮箱验证的账号才能发布、评论、收藏和发送消息。</small></span></div>}
     <main>{children}</main>
