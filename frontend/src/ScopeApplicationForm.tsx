@@ -1,0 +1,13 @@
+import {useEffect,useState,type FormEvent} from 'react';
+import {api} from './api';
+import {useAuth} from './auth';
+import type {ScopeApplication} from './types';
+
+export default function ScopeApplicationForm(){
+  const {user,schools}=useAuth(),[schoolId,setSchoolId]=useState(user?.schoolId||schools[0]?.id||''),[campusId,setCampusId]=useState(user?.campusId||''),[note,setNote]=useState(''),[file,setFile]=useState<File|null>(null),[applications,setApplications]=useState<ScopeApplication[]>([]),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
+  const school=schools.find(s=>s.id===schoolId);
+  useEffect(()=>{if(school&&!school.campuses.some(c=>c.id===campusId))setCampusId(school.campuses[0]?.id||'')},[schoolId,schools.length]);
+  const load=()=>void api<{applications:ScopeApplication[]}>('/api/scope-applications').then(d=>setApplications(d.applications)).catch(()=>{});useEffect(load,[]);
+  const submit=async(e:FormEvent)=>{e.preventDefault();if(!file)return;setBusy(true);setMessage('');try{const data=new FormData();data.append('schoolId',schoolId);data.append('campusId',campusId);data.append('note',note);data.append('evidence',file);await api('/api/scope-applications',{method:'POST',body:data});setFile(null);setNote('');setMessage('申请已提交，请等待对应校区管理员审核。');load()}catch(error){setMessage(error instanceof Error?error.message:'提交失败')}finally{setBusy(false)}};
+  return <section className="scope-application-card"><h2>申请设置学校与校区</h2><p>如果当前归属不正确，请选择目标学校和校区，并上传学生证、录取/在读证明等材料。材料仅对应校区管理员可见。</p>{message&&<div className="form-success">{message}</div>}<form className="publish-form" onSubmit={submit}><label>目标学校<select value={schoolId} onChange={e=>setSchoolId(e.target.value)} required>{schools.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>目标校区<select value={campusId} onChange={e=>setCampusId(e.target.value)} required>{school?.campuses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>佐证材料<input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={e=>setFile(e.target.files?.[0]||null)} required/><small>PDF、JPG、PNG 或 WebP，最大 8MB。</small></label><label>补充说明（可选）<textarea value={note} onChange={e=>setNote(e.target.value)} maxLength={500}/></label><button className="button primary" disabled={busy||!file}>{busy?'提交中…':'提交审核申请'}</button></form>{applications.length>0&&<div className="application-history"><h3>申请记录</h3>{applications.map(a=><div key={a.id}><b>{a.schoolName} · {a.campusName}</b><span className={`admin-pill ${a.status==='已通过'?'ok':a.status==='已驳回'?'off':'muted'}`}>{a.status}</span><small>{a.reviewNote||'等待审核'}</small></div>)}</div>}</section>;
+}

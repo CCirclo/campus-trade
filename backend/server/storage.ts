@@ -14,6 +14,15 @@ export async function uploadToCos(file:Express.Multer.File,folder:'items'|'avata
   return `/api/media/${Buffer.from(key).toString('base64url')}`;
 }
 
+export async function uploadPrivateEvidence(file:Express.Multer.File){
+  if(!cosConfigured())throw new Error('COS_NOT_CONFIGURED');
+  const cos=new COS({SecretId:process.env.COS_SECRET_ID!,SecretKey:process.env.COS_SECRET_KEY!});
+  const extension=file.mimetype==='application/pdf'?'pdf':file.mimetype==='image/png'?'png':file.mimetype==='image/webp'?'webp':'jpg';
+  const key=`campus-market/verification/${new Date().toISOString().slice(0,7)}/${randomUUID()}.${extension}`;
+  await new Promise<void>((resolve,reject)=>cos.putObject({Bucket:process.env.COS_BUCKET!,Region:process.env.COS_REGION!,Key:key,Body:file.buffer,ContentType:file.mimetype},error=>error?reject(error):resolve()));
+  return key;
+}
+
 export function decodeObjectKey(token:string){
   try{const key=Buffer.from(token,'base64url').toString('utf8');return key.startsWith('campus-market/')&&key.length<500?key:null}catch{return null}
 }

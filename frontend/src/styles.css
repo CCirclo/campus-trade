@@ -199,3 +199,5 @@
 .pagination-button svg{width:16px}
 .pagination-info{color:var(--muted);font-size:12px}
 @media (min-width:700px){.pagination{gap:18px}}
+.scope-application-card{margin:24px 0;padding:22px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:var(--shadow)}
+.scope-application-card>p{color:var(--muted);line-height:1.7}.application-history{display:grid;gap:10px;margin-top:22px}.application-history>div{display:grid;grid-template-columns:1fr auto;gap:6px;padding:12px;border-radius:12px;background:#f7f9fc}.application-history small{grid-column:1/-1;color:var(--muted)}

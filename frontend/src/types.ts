@@ -11,8 +11,10 @@ export type ChatMessage = { id:number; content:string; type:'text'|'item_card'; 
 
 export type AdminStats = { users:number; items:number; reports:number; reportsPending:number; schools:number };
 export type AdminUser = { id:number; email:string; nickname:string; avatarUrl:string; role:'user'|'admin'; verified:boolean; emailVerified:boolean; adminVerified:boolean; selfOperated:boolean; campusVerified:boolean; isSchoolManager:boolean; isSuperAdmin:boolean; schoolId:string; campusId:string; schoolName:string; campusName:string; emailMessageNotifications:boolean; createdAt:string; lastSeenAt:string|null; itemCount:number };
-export type AdminSchool = { id:string; name:string; active:boolean; emailDomains:string[]; campuses:Array<Campus & {active:boolean}>; manager:{id:number;email:string;nickname:string}|null };
-export type AdminContext = { isSuperAdmin:boolean; superAdminEmail:string; managedSchoolIds:string[]; schools:AdminSchool[] };
+export type AdminManager={id:number;email:string;nickname:string};
+export type AdminSchool = { id:string; name:string; active:boolean; emailDomains:string[]; campuses:Array<Campus & {active:boolean;manager?:AdminManager|null}>; manager:AdminManager|null };
+export type AdminContext = { isSuperAdmin:boolean; superAdminEmail:string; managedSchoolIds:string[]; managedCampuses:Array<{schoolId:string;campusId:string}>; schools:AdminSchool[] };
+export type ScopeApplication={id:number;userId:number;nickname:string;email:string;requestedSchoolId:string;requestedCampusId:string;schoolName:string;campusName:string;evidenceName:string;note:string;status:'待审核'|'已通过'|'已驳回';reviewNote:string;reviewerNickname:string|null;createdAt:string;reviewedAt:string|null};
 export type Report = { id:number; reason:string; detail:string; status:'待处理'|'已处理'|'已驳回'; createdAt:string; handledAt:string|null; handlerNickname:string|null; schoolId:string; campusId:string; schoolName:string; campusName:string; item:{id:number;title:string;price:number;image:string;status:string}; reporter:{id:number;nickname:string;email:string} };
 
 export type WalletBalance = { code:string; name:string; description:string; balance:number };

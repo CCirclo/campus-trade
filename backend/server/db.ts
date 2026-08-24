@@ -101,6 +101,37 @@ export async function initDatabase() {
       CONSTRAINT fk_school_admins_assigner FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
       INDEX idx_school_admins_user (user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS campus_admins (
+      school_id VARCHAR(40) NOT NULL,
+      campus_id VARCHAR(40) NOT NULL,
+      user_id BIGINT UNSIGNED NOT NULL,
+      assigned_by BIGINT UNSIGNED NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (school_id,campus_id,user_id),
+      CONSTRAINT fk_campus_admins_campus FOREIGN KEY (school_id,campus_id) REFERENCES campuses(school_id,id) ON DELETE CASCADE,
+      CONSTRAINT fk_campus_admins_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_campus_admins_assigner FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
+      INDEX idx_campus_admins_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS school_scope_applications (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      user_id BIGINT UNSIGNED NOT NULL,
+      requested_school_id VARCHAR(40) NOT NULL,
+      requested_campus_id VARCHAR(40) NOT NULL,
+      evidence_key VARCHAR(500) NOT NULL,
+      evidence_name VARCHAR(255) NOT NULL,
+      note VARCHAR(500) NOT NULL DEFAULT '',
+      status VARCHAR(20) NOT NULL DEFAULT '待审核',
+      review_note VARCHAR(500) NOT NULL DEFAULT '',
+      reviewer_id BIGINT UNSIGNED NULL,
+      reviewed_at TIMESTAMP NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_scope_app_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_scope_app_campus FOREIGN KEY (requested_school_id,requested_campus_id) REFERENCES campuses(school_id,id),
+      CONSTRAINT fk_scope_app_reviewer FOREIGN KEY (reviewer_id) REFERENCES users(id) ON DELETE SET NULL,
+      INDEX idx_scope_app_scope_status (requested_school_id,requested_campus_id,status,created_at),
+      INDEX idx_scope_app_user (user_id,created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     `CREATE TABLE IF NOT EXISTS runtime_secrets (
       secret_name VARCHAR(32) NOT NULL PRIMARY KEY,
       secret_value CHAR(64) NOT NULL,
@@ -295,6 +326,7 @@ export async function initDatabase() {
   await initializeSchoolCatalog();
   await migrateCampusColumns();
   await migrateAdminColumns();
+  await migrateCampusAdminScopes();
   if(!await columnExists('email_codes','purpose'))await pool.query(`ALTER TABLE email_codes ADD COLUMN purpose VARCHAR(20) NOT NULL DEFAULT 'register' AFTER attempts`);
   if(!await columnExists('items','currency'))await pool.query(`ALTER TABLE items ADD COLUMN currency VARCHAR(20) NOT NULL DEFAULT 'cny' AFTER price`);
   if(!await columnExists('items','rmb_price'))await pool.query(`ALTER TABLE items ADD COLUMN rmb_price DECIMAL(10,2) NULL AFTER currency`);
@@ -344,6 +376,14 @@ async function migrateAdminColumns(){
   if(!await columnExists('users','role'))await pool.query(`ALTER TABLE users ADD COLUMN role VARCHAR(10) NOT NULL DEFAULT 'user' AFTER email_message_notifications`);
   if(!await columnExists('users','admin_verified'))await pool.query(`ALTER TABLE users ADD COLUMN admin_verified TINYINT(1) NOT NULL DEFAULT 0 AFTER role`);
   if(!await columnExists('users','self_operated'))await pool.query(`ALTER TABLE users ADD COLUMN self_operated TINYINT(1) NOT NULL DEFAULT 0 AFTER admin_verified`);
+}
+
+async function migrateCampusAdminScopes(){
+  const migrated=await one(`SELECT setting_key FROM platform_settings WHERE setting_key='campus_admin_scope_migrated_v1'`);
+  if(migrated)return;
+  await pool.query(`INSERT IGNORE INTO campus_admins (school_id,campus_id,user_id,assigned_by)
+    SELECT sa.school_id,c.id,sa.user_id,sa.assigned_by FROM school_admins sa JOIN campuses c ON c.school_id=sa.school_id`);
+  await run(`INSERT INTO platform_settings (setting_key,setting_value) VALUES ('campus_admin_scope_migrated_v1',JSON_OBJECT('completed',true))`);
 }
 
 async function migrateLedgerAmount(){

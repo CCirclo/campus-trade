@@ -371,12 +371,17 @@
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/admin/stats` | 平台统计 |
-| GET | `/api/admin/context` | 当前管理员级别、授权学校和学校详情 |
+| GET | `/api/admin/context` | 当前管理员级别、授权学校、授权校区和学校详情 |
 | GET | `/api/admin/schools` | 授权学校、域名、校区和负责人 |
 | POST | `/api/admin/schools` | 新增学校（仅总管理员） |
 | PATCH | `/api/admin/schools/:id` | 修改名称、邮箱域名、添加或更新校区（仅总管理员） |
 | GET | `/api/admin/schools/:id/candidates` | 负责人候选用户（仅总管理员） |
-| PUT | `/api/admin/schools/:id/manager` | 指定学校负责人（仅总管理员） |
+| PUT | `/api/admin/schools/:id/campuses/:campusId/manager` | 指定校区负责人（仅总管理员） |
+| GET | `/api/scope-applications` | 当前用户的学校/校区归属申请 |
+| POST | `/api/scope-applications` | 上传私密佐证材料并提交归属申请 |
+| GET | `/api/admin/scope-applications` | 按管理员校区权限列出申请；总管理员可筛选学校和校区 |
+| GET | `/api/admin/scope-applications/:id/evidence` | 获取短时签名的私密佐证材料 |
+| PATCH | `/api/admin/scope-applications/:id` | 通过或驳回申请 |
 | GET | `/api/admin/users` | 用户列表 |
 | POST | `/api/admin/users` | 创建用户 |
 | PATCH | `/api/admin/users/:id` | 编辑用户 |
@@ -387,7 +392,7 @@
 | GET | `/api/admin/reports` | 举报列表 |
 | PATCH | `/api/admin/reports/:id` | 处置举报 |
 
-> 总管理员可在学校页面指定该学校已有用户为负责人，系统会赋予其 `admin` 角色和负责人关系。普通管理员的用户、商品、举报和统计接口均按学校过滤，不能依靠修改请求参数越权。
+> 总管理员可按校区指定负责人。普通管理员的用户、商品、举报、申请和统计接口均按精确的 `school_id + campus_id` 过滤；佐证材料只通过权限校验后的短时签名链接访问。
 
 ---
 

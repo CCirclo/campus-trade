@@ -26,13 +26,14 @@ import {RecommendationInputError,recommendations} from './recommendation-service
 import {initRuntimeSecrets} from './runtime-secret.js';
 import {canViewItemInScope} from './market-scope.js';
 import {campusBelongsToSchool,defaultCampusScope,publicSchoolCatalog} from './campus-catalog.js';
+import {adminScopeApplicationRouter,scopeApplicationRouter} from './scope-applications.js';
 
 const app=express(),port=Number(process.env.PORT)||8787,host=process.env.HOST||'127.0.0.1',appOrigin=process.env.APP_ORIGIN||'http://localhost:5173';
 const asyncRoute=(handler:(req:AuthedRequest,res:Response,next:NextFunction)=>Promise<unknown>):RequestHandler=>(req,res,next)=>{void handler(req,res,next).catch(next)};
 
 app.disable('x-powered-by');app.set('trust proxy','loopback');app.use(express.json({limit:'1mb'}));app.use(cookieParser());
 const securityHeaders:RequestHandler=(req,res,next)=>{res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');res.setHeader('X-Frame-Options','DENY');res.setHeader('Cross-Origin-Opener-Policy','same-origin');res.setHeader('Cross-Origin-Resource-Policy','same-origin');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");if(process.env.NODE_ENV==='production')res.setHeader('Strict-Transport-Security','max-age=31536000');if(['POST','PUT','PATCH','DELETE'].includes(req.method)&&!isAllowedOrigin(req.headers.origin,appOrigin))return res.status(403).json({error:'请求来源不受信任'});next()};app.use(securityHeaders);
-app.use(optionalAuth);app.use('/api/auth',authRouter);app.use('/api/admin',requireAdmin,adminRouter);
+app.use(optionalAuth);app.use('/api/auth',authRouter);app.use('/api/scope-applications',scopeApplicationRouter);app.use('/api/admin/scope-applications',requireAdmin,adminScopeApplicationRouter);app.use('/api/admin',requireAdmin,adminRouter);
 
 const itemSelect=`SELECT i.*,u.id AS seller_id,u.nickname AS seller_nickname,u.avatar_url AS seller_avatar,u.email AS seller_email,u.email_verified AS seller_email_verified,u.admin_verified AS seller_admin_verified FROM items i JOIN users u ON u.id=i.user_id`;
 function requestScope(req:AuthedRequest){if(req.user)return{schoolId:req.user.schoolId,campusId:req.user.campusId};const fallback=defaultCampusScope(),schoolId=cleanText(req.query.schoolId,40)||fallback.schoolId,campusId=cleanText(req.query.campusId,40)||fallback.campusId;return campusBelongsToSchool(schoolId,campusId)?{schoolId,campusId}:fallback;}
