@@ -1,5 +1,88 @@
 # 校园闲鱼（campus-trade）
 
+## 开发、审核与自动部署工作流
+
+你和队友都通过功能分支与 Pull Request 协作，不能直接推送受保护的 `main`。合并后由 GitHub Actions 自动部署；数据库、服务器环境变量和 COS 文件不会被代码发布覆盖。
+
+```mermaid
+flowchart TD
+    subgraph DEV["① 本地开发"]
+        YOU["你<br/>本地仓库"]
+        TEAM["队友<br/>本地仓库"]
+        SYNC["同步最新 main<br/>git pull --rebase"]
+        BRANCH["创建功能分支<br/>feature/* 或 codex/*"]
+        TEST["本地测试与构建<br/>npm test<br/>npm run build"]
+
+        YOU --> SYNC
+        TEAM --> SYNC
+        SYNC --> BRANCH --> TEST
+    end
+
+    subgraph GH["② GitHub 协作"]
+        PUSH["推送功能分支<br/>git push"]
+        PR["创建 Pull Request<br/>目标：main"]
+        CI{"GitHub Actions CI"}
+        WEB["Web 与后端<br/>测试 · 类型检查 · 构建"]
+        ANDROID["Android<br/>Debug · Release 构建"]
+        REVIEW{"非作者队友审核"}
+        FIX["修改代码<br/>再次推送"]
+        MERGE["Squash 合并到 main"]
+        CLEAN["删除已合并分支"]
+
+        PUSH --> PR --> CI
+        CI --> WEB
+        CI --> ANDROID
+        WEB --> REVIEW
+        ANDROID --> REVIEW
+        REVIEW -->|"需要修改"| FIX --> CI
+        REVIEW -->|"批准且 CI 通过"| MERGE --> CLEAN
+    end
+
+    subgraph PROTECT["main 分支保护"]
+        BLOCK["禁止直接 push main"]
+        REQUIRED["必须通过 PR<br/>至少 1 位非作者批准"]
+        NO_BYPASS["管理员不能始终绕过"]
+    end
+
+    subgraph DEPLOY["③ 自动部署"]
+        TRIGGER["main 更新<br/>触发 deploy.yml"]
+        PACKAGE["测试并构建生产包"]
+        SSH["通过部署专用 SSH<br/>连接国内腾讯云服务器"]
+        RELEASE["创建新版本目录<br/>/srv/campus-market/releases/提交 SHA"]
+        SWITCH["原子切换 current 软链接"]
+        RESTART["重启<br/>campus-market-web.service"]
+        HEALTH{"健康检查<br/>/api/health"}
+
+        TRIGGER --> PACKAGE --> SSH --> RELEASE --> SWITCH --> RESTART --> HEALTH
+    end
+
+    subgraph SERVER["④ 腾讯云 Ubuntu 24.04"]
+        NGINX["Nginx<br/>HTTPS 与反向代理"]
+        APP["Node.js / Express<br/>Web 与 API"]
+        MYSQL[("MySQL 数据库<br/>独立持久保存")]
+        CONFIG["服务器配置<br/>/etc/campus-market/.env"]
+        COS["腾讯云 COS<br/>图片与申请材料"]
+
+        NGINX --> APP
+        APP --> MYSQL
+        CONFIG --> APP
+        APP --> COS
+    end
+
+    SUCCESS["部署成功<br/>新版本正式上线"]
+    ROLLBACK["部署失败<br/>自动切回上一个可用版本"]
+
+    TEST --> PUSH
+    BLOCK -.约束.-> PR
+    REQUIRED -.约束.-> REVIEW
+    NO_BYPASS -.约束.-> MERGE
+    MERGE --> TRIGGER
+    HEALTH -->|"通过"| NGINX
+    HEALTH -->|"失败"| ROLLBACK
+    NGINX --> SUCCESS
+    ROLLBACK --> NGINX
+```
+
 ## 多学校与多校区
 
 Web 与后端支持多个学校、每所学校多个校区。账号和商品分别保存 `school_id` 与 `campus_id`：学校由受支持的校园邮箱域名确定，普通用户不能在个人资料中修改；校区可在同一学校内随时切换。商品保存发布时的学校/校区快照，切换个人校区不会移动历史商品。
