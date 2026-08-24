@@ -3,31 +3,69 @@ import PhotosUI
 import UIKit
 
 struct ConversationsView: View {
-    @EnvironmentObject var session: SessionStore; @State private var conversations: [Conversation] = []; @State private var error: String?
+    @EnvironmentObject var session: SessionStore; @State private var conversations: [Conversation] = []; @State private var error: String?; @State private var loading = false
     var body: some View {
         Group {
             if session.user == nil { loginEmpty }
-            else if let error { ErrorState(message: error) { Task { await load() } } }
+            else if loading && conversations.isEmpty { LoadingState() }
+            else if let error, conversations.isEmpty { ErrorState(message: error) { Task { await load() } } }
             else if conversations.isEmpty { ContentUnavailableView("暂无消息", systemImage: "message", description: Text("从商品详情联系卖家后，会话会显示在这里。")) }
             else { List(conversations) { item in NavigationLink { ChatView(conversation: item) } label: { HStack(spacing: 12) { AvatarImage(url: item.partner.avatarUrl, name: item.partner.nickname); VStack(alignment: .leading) { HStack { Text(item.partner.nickname).font(.headline); Spacer(); if item.unreadCount > 0 { Text("\(item.unreadCount)").font(.caption.bold()).padding(6).background(Theme.coral).foregroundStyle(.white).clipShape(Circle()) } }; Text(item.itemTitle).font(.caption).foregroundStyle(.secondary); Text(item.lastMessage).lineLimit(1) } } } }.refreshable { await load() } }
         }.navigationTitle("商品消息").task { if session.user != nil { await load() } }
     }
     private var loginEmpty: some View { ContentUnavailableView { Label("登录后查看消息", systemImage: "message.badge") } actions: { Button("去登录") { session.showLogin = true }.buttonStyle(.borderedProminent).tint(Theme.ink) } }
-    private func load() async { do { let r: ConversationsResponse = try await APIClient.shared.request("/api/conversations"); conversations = r.conversations; error = nil } catch { self.error = error.localizedDescription } }
+    private func load() async { loading = true; defer { loading = false }; do { let r: ConversationsResponse = try await APIClient.shared.request("/api/conversations"); conversations = r.conversations; error = nil } catch { self.error = error.localizedDescription } }
 }
 
 struct ChatView: View {
     @EnvironmentObject var session: SessionStore; let conversation: Conversation
-    @State private var messages: [ChatMessage] = []; @State private var text = ""; @State private var notice: String?
+    @State private var messages: [ChatMessage] = []; @State private var text = ""; @State private var notice: String?; @State private var loading = true; @State private var sending = false
+    @FocusState private var composerFocused: Bool
     var body: some View {
         VStack(spacing: 0) {
-            ScrollViewReader { proxy in ScrollView { LazyVStack(spacing: 12) { ForEach(messages) { message in HStack(alignment: .bottom) { if message.mine { Spacer(minLength: 48) }; if message.type == "item_card", let item = message.item { ChatItemCard(item: item) } else { Text(message.content).padding(.horizontal, 13).padding(.vertical, 10).background(message.mine ? Theme.ink : Color.gray.opacity(0.12)).foregroundStyle(message.mine ? .white : .primary).clipShape(RoundedRectangle(cornerRadius: 16)) }; if !message.mine { Spacer(minLength: 48) } }.id(message.id) } }.padding().padding(.bottom, 8) }.onChange(of: messages.count) { _, _ in if let last = messages.last { withAnimation(.easeOut(duration: 0.18)) { proxy.scrollTo(last.id, anchor: .bottom) } } } }
-            HStack { TextField("输入消息", text: $text, axis: .vertical); Button("发送") { Task { await send() } }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !session.isCampusUser) }.padding().background(.bar)
-        }.navigationTitle(conversation.partner.nickname).navigationBarTitleDisplayMode(.inline).task { await refresh(); while !Task.isCancelled { try? await Task.sleep(for: .seconds(5)); await refresh() } }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        if loading && messages.isEmpty {
+                            ProgressView().padding(.top, 48)
+                        } else if messages.isEmpty {
+                            ContentUnavailableView("还没有消息", systemImage: "bubble.left.and.bubble.right", description: Text("发条消息开始沟通吧。")).padding(.top, 48)
+                        }
+                        ForEach(messages) { message in
+                            HStack(alignment: .bottom) {
+                                if message.mine { Spacer(minLength: 48) }
+                                if message.type == "item_card", let item = message.item {
+                                    ChatItemCard(item: item)
+                                } else {
+                                    Text(message.content).padding(.horizontal, 13).padding(.vertical, 10).background(message.mine ? Theme.ink : Color.gray.opacity(0.12)).foregroundStyle(message.mine ? .white : .primary).clipShape(RoundedRectangle(cornerRadius: 16))
+                                }
+                                if !message.mine { Spacer(minLength: 48) }
+                            }.id(message.id)
+                        }
+                    }.padding().padding(.bottom, 8)
+                }
+                .scrollDismissesKeyboard(.interactively)
+                .onChange(of: messages.count) { _, _ in
+                    if let last = messages.last { withAnimation(.easeOut(duration: 0.18)) { proxy.scrollTo(last.id, anchor: .bottom) } }
+                }
+            }
+            HStack {
+                TextField("输入消息", text: $text, axis: .vertical).focused($composerFocused).submitLabel(.send).onSubmit { Task { await send() } }
+                if sending { ProgressView().controlSize(.small).frame(width: 44) }
+                else { Button("发送") { Task { await send() } }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !session.isCampusUser) }
+            }.padding().background(.bar)
+        }.navigationTitle(conversation.partner.nickname).navigationBarTitleDisplayMode(.inline).task {
+            await refresh()
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(5)) } catch { break }
+                guard !Task.isCancelled else { break }
+                await refresh()
+            }
+        }
         .alert("发送失败", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) { Button("知道了") {} } message: { Text(notice ?? "") }
     }
-    private func refresh() async { do { let r: MessagesResponse = try await APIClient.shared.request("/api/conversations/\(conversation.id)/messages"); messages = r.messages; let _: OKResponse? = try? await APIClient.shared.request("/api/conversations/\(conversation.id)/read", method: "POST") } catch { if messages.isEmpty { notice = error.localizedDescription } } }
-    private func send() async { struct P: Encodable { let content: String }; let value = text.trimmingCharacters(in: .whitespacesAndNewlines); do { let _: IDResponse = try await APIClient.shared.request("/api/conversations/\(conversation.id)/messages", method: "POST", body: P(content: value)); text = ""; await refresh() } catch { notice = error.localizedDescription } }
+    private func refresh() async { do { let r: MessagesResponse = try await APIClient.shared.request("/api/conversations/\(conversation.id)/messages"); messages = r.messages; let _: OKResponse? = try? await APIClient.shared.request("/api/conversations/\(conversation.id)/read", method: "POST") } catch { if messages.isEmpty { notice = error.localizedDescription } }; loading = false }
+    private func send() async { struct P: Encodable { let content: String }; let value = text.trimmingCharacters(in: .whitespacesAndNewlines); guard !value.isEmpty, !sending else { return }; sending = true; defer { sending = false }; do { let _: IDResponse = try await APIClient.shared.request("/api/conversations/\(conversation.id)/messages", method: "POST", body: P(content: value)); text = ""; await refresh() } catch { notice = error.localizedDescription } }
 }
 
 private struct ChatItemCard: View {
@@ -130,8 +168,16 @@ struct ProfileEditView: View {
 }
 
 struct ItemCollectionView: View {
-    let path: String; let title: String; @State private var items: [Item] = []
-    var body: some View { ScrollView { if items.isEmpty { ContentUnavailableView("这里还是空的", systemImage: "shippingbox") } else { LazyVStack(spacing: 12) { ForEach(items) { item in NavigationLink { ItemDetailView(id: item.id) } label: { ItemRow(item: item) }.buttonStyle(.plain) } }.padding().padding(.bottom, 76) } }.marketBackground().navigationTitle(title).toolbarBackground(Theme.paper, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar).task { let r: ItemsResponse? = try? await APIClient.shared.request(path); items = r?.items ?? [] } }
+    let path: String; let title: String; @State private var items: [Item] = []; @State private var loading = false; @State private var error: String?
+    var body: some View {
+        ScrollView {
+            if loading && items.isEmpty { ProgressView().frame(maxWidth: .infinity).padding(.top, 80) }
+            else if let error, items.isEmpty { ErrorState(message: error) { Task { await load() } }.frame(height: 320) }
+            else if items.isEmpty { ContentUnavailableView("这里还是空的", systemImage: "shippingbox") }
+            else { LazyVStack(spacing: 12) { ForEach(items) { item in NavigationLink { ItemDetailView(id: item.id) } label: { ItemRow(item: item) }.buttonStyle(.plain) } }.padding().padding(.bottom, 76) }
+        }.marketBackground().navigationTitle(title).toolbarBackground(Theme.paper, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar).task { await load() }.refreshable { await load() }
+    }
+    private func load() async { loading = true; error = nil; defer { loading = false }; do { let response: ItemsResponse = try await APIClient.shared.request(path); items = response.items } catch { self.error = error.localizedDescription } }
 }
 
 struct SafetyView: View { var body: some View { List { Section("校园面交，安全第一") { Label("优先在教学楼、食堂等公共区域见面", systemImage: "building.2"); Label("确认型号、功能和成色后再付款", systemImage: "checkmark.circle"); Label("拒绝押金、保证金与陌生付款链接", systemImage: "link.badge.plus"); Label("重要约定保留在站内消息中", systemImage: "message") } }.navigationTitle("安全交易指南") } }

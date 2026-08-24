@@ -65,6 +65,8 @@ struct HomeView: View {
 struct ItemDetailView: View {
     @EnvironmentObject var session: SessionStore; let id: Int
     @State private var response: ItemResponse?; @State private var error: String?; @State private var comment = ""; @State private var notice: String?
+    @State private var chatDestination: Conversation?
+    @State private var contacting = false
     var body: some View {
         Group {
             if let response {
@@ -92,7 +94,7 @@ struct ItemDetailView: View {
                             }.buttonStyle(.plain)
                         }
                         Text(response.item.description).frame(maxWidth: .infinity, alignment: .leading)
-                        HStack(spacing: 10) { Button(response.favorited ? "已收藏" : "收藏", systemImage: response.favorited ? "heart.fill" : "heart") { Task { await favorite() } }.buttonStyle(.bordered).tint(Theme.coral); Button("联系卖家", systemImage: "message") { Task { await chat() } }.buttonStyle(.borderedProminent).tint(Theme.ink) }.controlSize(.large)
+                        HStack(spacing: 10) { Button(response.favorited ? "已收藏" : "收藏", systemImage: response.favorited ? "heart.fill" : "heart") { Task { await favorite() } }.buttonStyle(.bordered).tint(Theme.coral); Button(contacting ? "正在连接…" : "联系卖家", systemImage: "message") { Task { await chat() } }.buttonStyle(.borderedProminent).tint(Theme.ink).disabled(contacting) }.controlSize(.large)
                         Divider(); Text("留言").font(.title2.bold())
                         ForEach(response.comments) { c in VStack(alignment: .leading) { Text(c.author.nickname).font(.subheadline.bold()); Text(c.content) }.padding(.vertical, 4) }
                         HStack { TextField("写下你的留言", text: $comment); Button("发送") { Task { await sendComment() } }.disabled(comment.trimmingCharacters(in: .whitespaces).count < 2) }.padding().background(.white).clipShape(RoundedRectangle(cornerRadius: 14))
@@ -100,12 +102,23 @@ struct ItemDetailView: View {
                 } }
             } else if let error { ErrorState(message: error) { Task { await load() } } } else { LoadingState() }
         }.marketBackground().navigationTitle("商品详情").navigationBarTitleDisplayMode(.inline).toolbarBackground(Theme.paper, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar).task { await load() }
+        .navigationDestination(isPresented: Binding(get: { chatDestination != nil }, set: { if !$0 { chatDestination = nil } })) {
+            if let chatDestination { ChatView(conversation: chatDestination) }
+        }
         .alert("提示", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) { Button("知道了") {} } message: { Text(notice ?? "") }
     }
     private func requireCampus() -> Bool { if session.user == nil { session.showLogin = true; return false }; if !session.isCampusUser { notice = "仅通过 @ruc.edu.cn 验证的校园用户可以进行此操作。"; return false }; return true }
     private func load() async { do { response = try await APIClient.shared.request("/api/items/\(id)") } catch { self.error = error.localizedDescription } }
     private func favorite() async { guard requireCampus() else { return }; do { let _: FavoriteResponse = try await APIClient.shared.request("/api/items/\(id)/favorite", method: "POST"); await load() } catch { notice = error.localizedDescription } }
-    private func chat() async { guard requireCampus() else { return }; struct P: Encodable { let itemId: Int }; do { let r: IDResponse = try await APIClient.shared.request("/api/conversations", method: "POST", body: P(itemId: id)); notice = "会话已创建（编号 \(r.id)），请前往消息页继续沟通。" } catch { notice = error.localizedDescription } }
+    private func chat() async {
+        guard requireCampus(), let item = response?.item, let seller = item.seller else { return }
+        struct P: Encodable { let itemId: Int }
+        contacting = true; defer { contacting = false }
+        do {
+            let result: IDResponse = try await APIClient.shared.request("/api/conversations", method: "POST", body: P(itemId: id))
+            chatDestination = Conversation(id: result.id, itemId: item.id, itemTitle: item.title, partner: Partner(nickname: seller.nickname, avatarUrl: seller.avatarUrl), lastMessage: "", unreadCount: 0, updatedAt: "")
+        } catch { notice = error.localizedDescription }
+    }
     private func sendComment() async { guard requireCampus() else { return }; struct P: Encodable { let content: String }; do { let _: IDResponse = try await APIClient.shared.request("/api/items/\(id)/comments", method: "POST", body: P(content: comment)); comment = ""; await load() } catch { notice = error.localizedDescription } }
 }
 
