@@ -233,8 +233,8 @@
 ```json
 {
   "wallet": {
-    "originium": { "code": "originium", "name": "至纯源石", "description": "开发贡献凭证 · 或参与治理与分红", "balance": 10 },
-    "lungmen": { "code": "lungmen", "name": "龙门币", "description": "通用货币 · 可兑换商品与抽奖", "balance": 200 }
+    "originium": { "code": "originium", "name": "创世结晶", "description": "稀有货币 · 参与抽奖与限定兑换", "balance": 10 },
+    "lungmen": { "code": "lungmen", "name": "原石", "description": "通用货币 · 发布与购买商品可获得，可兑换自营商品", "balance": 200 }
   },
   "entries": [
     { "id": 1, "currency": "lungmen", "amount": 100, "balanceAfter": 200, "reason": "社区贡献奖励", "operator": "管理员", "createdAt": "2026-08-20T08:00:00.000Z" }

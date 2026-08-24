@@ -3,7 +3,9 @@ import { randomInt } from 'node:crypto';
 import { clearSession,createSession,hashPassword,requireAuth,type AuthedRequest,verifyPassword } from './auth.js';
 import { one,publicUser,run } from './db.js';
 import { mailConfigured,sendPasswordResetCode,sendVerificationCode } from './mail.js';
-import { cleanText,consumeRateLimit,hashToken,normalizeEmail,SESSION_COOKIE,safeEqual,validEmail } from './security.js';
+import { cleanText,consumeRateLimit,hashToken,isCampusEmail,normalizeEmail,SESSION_COOKIE,safeEqual,validEmail } from './security.js';
+import { getRewardSettings } from './settings.js';
+import { grantCurrency } from './wallet.js';
 
 export const authRouter=Router();
 const rateKey=(req:AuthedRequest,action:string)=>`${action}:${req.ip||req.socket.remoteAddress||'unknown'}`;
@@ -39,7 +41,9 @@ authRouter.post('/register',async(req:AuthedRequest,res,next)=>{try{
   }
   const result=await run(`INSERT INTO users (email,password_hash,nickname,school_id,verified,email_verified,email_message_notifications) VALUES (?,?,?,'ruc_suzhou',1,1,?)`,[email,await hashPassword(password),nickname,emailNotifications?1:0]);
   await run('DELETE FROM email_codes WHERE email=?',[email]);
-  await createSession(res,result.insertId); const user=await one('SELECT * FROM users WHERE id=?',[result.insertId]); res.status(201).json({user:publicUser(user)});
+  await createSession(res,result.insertId);
+  await grantSignupReward(result.insertId,email);
+  const user=await one('SELECT * FROM users WHERE id=?',[result.insertId]); res.status(201).json({user:publicUser(user)});
 }catch(e){next(e)}});
 
 authRouter.post('/login',async(req:AuthedRequest,res,next)=>{try{
@@ -96,3 +100,16 @@ authRouter.post('/reset-password',async(req:AuthedRequest,res,next)=>{try{
   await run('DELETE FROM sessions WHERE user_id=?',[Number(user.id)]);
   res.json({ok:true});
 }catch(e){next(e)}});
+
+async function grantSignupReward(userId:number,email:string){
+  try{
+    const settings=await getRewardSettings();
+    if(!settings.signupEnabled)return;
+    if(settings.signupCampusOnly&&!isCampusEmail(email))return;
+    const operator='系统';
+    for(const currency of ['lungmen','originium'] as const){
+      const amount=settings.signupBonus[currency];
+      if(amount>0)await grantCurrency({userId,currency,amount,reason:'注册奖励',operator});
+    }
+  }catch(error){console.error('Signup reward failed:',error)}
+}

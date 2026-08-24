@@ -45,6 +45,7 @@ export async function initDatabase() {
       email_message_notifications TINYINT(1) NOT NULL DEFAULT 1,
       role VARCHAR(10) NOT NULL DEFAULT 'user',
       admin_verified TINYINT(1) NOT NULL DEFAULT 0,
+      self_operated TINYINT(1) NOT NULL DEFAULT 0,
       last_seen_at TIMESTAMP NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
@@ -74,7 +75,10 @@ export async function initDatabase() {
       title VARCHAR(80) NOT NULL,
       price DECIMAL(10,2) NOT NULL,
       images JSON NOT NULL,
+      regions JSON NULL,
       category VARCHAR(20) NOT NULL,
+      kind VARCHAR(10) NOT NULL DEFAULT '商品',
+      easter_egg VARCHAR(20) NULL,
       item_condition VARCHAR(20) NOT NULL,
       description TEXT NOT NULL,
       school_id VARCHAR(40) NOT NULL,
@@ -213,7 +217,7 @@ export async function initDatabase() {
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
       user_id BIGINT UNSIGNED NOT NULL,
       currency VARCHAR(20) NOT NULL,
-      amount BIGINT UNSIGNED NOT NULL,
+      amount BIGINT NOT NULL,
       balance_after BIGINT UNSIGNED NOT NULL,
       reason VARCHAR(200) NOT NULL,
       operator VARCHAR(160) NOT NULL,
@@ -221,10 +225,42 @@ export async function initDatabase() {
       CONSTRAINT fk_currency_ledger_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       INDEX idx_currency_ledger_user (user_id, currency, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS platform_settings (
+      setting_key VARCHAR(64) NOT NULL PRIMARY KEY,
+      setting_value JSON NOT NULL,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS orders (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      item_id BIGINT UNSIGNED NULL,
+      buyer_id BIGINT UNSIGNED NOT NULL,
+      seller_id BIGINT UNSIGNED NOT NULL,
+      currency VARCHAR(20) NOT NULL,
+      amount BIGINT UNSIGNED NOT NULL,
+      item_title VARCHAR(80) NOT NULL DEFAULT '',
+      item_image VARCHAR(800) NOT NULL DEFAULT '',
+      status VARCHAR(20) NOT NULL DEFAULT '待确认收货',
+      paid_at TIMESTAMP NULL,
+      completed_at TIMESTAMP NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT fk_orders_item FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
+      CONSTRAINT fk_orders_buyer FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_orders_seller FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE,
+      INDEX idx_orders_buyer (buyer_id,status),
+      INDEX idx_orders_seller (seller_id,status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   ];
   for (const statement of statements) await pool.query(statement);
   await migrateAdminColumns();
   if(!await columnExists('email_codes','purpose'))await pool.query(`ALTER TABLE email_codes ADD COLUMN purpose VARCHAR(20) NOT NULL DEFAULT 'register' AFTER attempts`);
+  if(!await columnExists('items','currency'))await pool.query(`ALTER TABLE items ADD COLUMN currency VARCHAR(20) NOT NULL DEFAULT 'cny' AFTER price`);
+  if(!await columnExists('items','rmb_price'))await pool.query(`ALTER TABLE items ADD COLUMN rmb_price DECIMAL(10,2) NULL AFTER currency`);
+  if(!await columnExists('items','regions'))await pool.query(`ALTER TABLE items ADD COLUMN regions JSON NULL AFTER images`);
+  if(!await columnExists('items','kind'))await pool.query(`ALTER TABLE items ADD COLUMN kind VARCHAR(10) NOT NULL DEFAULT '商品' AFTER category`);
+  if(!await columnExists('items','easter_egg'))await pool.query(`ALTER TABLE items ADD COLUMN easter_egg VARCHAR(20) NULL AFTER kind`);
+  await pool.query(`UPDATE items SET regions=JSON_ARRAY('苏州区','北京区') WHERE regions IS NULL`);
+  await migrateLedgerAmount();
   await migrateConversations();
   await run('DELETE FROM behavior_events WHERE received_at<DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 90 DAY)');
   await promoteAdminsFromEnv();
@@ -237,6 +273,12 @@ async function indexExists(table:string,index:string){return Boolean(await one(`
 async function migrateAdminColumns(){
   if(!await columnExists('users','role'))await pool.query(`ALTER TABLE users ADD COLUMN role VARCHAR(10) NOT NULL DEFAULT 'user' AFTER email_message_notifications`);
   if(!await columnExists('users','admin_verified'))await pool.query(`ALTER TABLE users ADD COLUMN admin_verified TINYINT(1) NOT NULL DEFAULT 0 AFTER role`);
+  if(!await columnExists('users','self_operated'))await pool.query(`ALTER TABLE users ADD COLUMN self_operated TINYINT(1) NOT NULL DEFAULT 0 AFTER admin_verified`);
+}
+
+async function migrateLedgerAmount(){
+  const row=await one(`SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='currency_ledger' AND COLUMN_NAME='amount'`);
+  if(row&&String(row.COLUMN_TYPE).toLowerCase().includes('unsigned'))await pool.query('ALTER TABLE currency_ledger MODIFY amount BIGINT NOT NULL');
 }
 
 async function promoteAdminsFromEnv(){
@@ -288,6 +330,7 @@ export function publicUser(row: Record<string, unknown> | undefined) {
     campusVerified:Boolean(row.admin_verified) || (Boolean(row.email_verified) && isCampusEmail(row.email)),
     emailMessageNotifications:Boolean(row.email_message_notifications),
     adminVerified:Boolean(row.admin_verified),
+    selfOperated:Boolean(row.self_operated),
     role:String(row.role || 'user') === 'admin' ? 'admin' as const : 'user' as const,
   };
 }
@@ -295,10 +338,16 @@ export function publicUser(row: Record<string, unknown> | undefined) {
 export function mapItem(row: Record<string, unknown>) {
   const rawImages = row.images;
   const images = Array.isArray(rawImages) ? rawImages : JSON.parse(String(rawImages || '[]'));
+  const rawRegions = row.regions;
+  let parsedRegions: unknown = [];
+  if (Array.isArray(rawRegions)) parsedRegions = rawRegions;
+  else { try { parsedRegions = JSON.parse(String(rawRegions || '[]')); } catch { parsedRegions = []; } }
+  const regionNames = (Array.isArray(parsedRegions) ? parsedRegions : []).map(v => String(v)).filter(Boolean);
+  const regions = regionNames.length ? regionNames : ['苏州区', '北京区'];
   return {
     id:Number(row.id), userId:Number(row.user_id), title:String(row.title), price:Number(row.price), images,
-    category:String(row.category), condition:String(row.item_condition), description:String(row.description || ''),
-    schoolId:String(row.school_id), status:String(row.status), createdAt:dateIso(row.created_at), updatedAt:dateIso(row.updated_at),
+    category:String(row.category), condition:String(row.item_condition), kind:String(row.kind || '商品'), easterEgg:row.easter_egg?String(row.easter_egg):null, description:String(row.description || ''),
+    schoolId:String(row.school_id), status:String(row.status), currency:String(row.currency || 'cny'), rmbPrice:row.rmb_price?Number(row.rmb_price):null, regions, createdAt:dateIso(row.created_at), updatedAt:dateIso(row.updated_at),
     seller: row.seller_id ? { id:Number(row.seller_id), nickname:String(row.seller_nickname), avatarUrl:String(row.seller_avatar || ''), verified:Boolean(row.seller_email_verified)&&(isCampusEmail(row.seller_email)||Boolean(row.seller_admin_verified)) } : undefined,
   };
 }

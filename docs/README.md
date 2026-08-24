@@ -10,5 +10,6 @@
 | [`operations.md`](operations.md) | 生产部署、Embedding 安装、监控、降级、回滚和排障 |
 | [`release-checklist.md`](release-checklist.md) | 每次上线前后的可执行检查清单 |
 | [`github-actions-deployment.md`](github-actions-deployment.md) | GitHub Actions 与服务器初次接入 |
+| [`admin-guide.md`](admin-guide.md) | 管理员操作说明：奖励机制、币种交易、担保交易与校园认证 |
 
 生产事实以代码、`backend/deploy/production.env.example` 和已安装的 systemd 单元为准。真实 `.env`、邮箱、COS、SSH 和数据库密钥不得进入仓库。

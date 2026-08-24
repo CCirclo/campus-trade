@@ -25,7 +25,10 @@
 - 关键词归一化、校园别名、型号精确匹配、分页与离线搜索评测
 - 可选本地 Embedding、混合检索、行为事件、灰度推荐与指标分析
 - Android 商品分页、聊天轮询、Keystore 会话加密和只读奖励钱包
-- 管理员奖励发放、并发安全钱包流水和用户端余额查询
+- 原石 / 创世结晶双币种钱包：注册、发布、购买自动奖励，管理员可配置与手动发放
+- 自营账号体系：仅自营账号可发布原石计价商品，支持人民币 + 原石双价格展示
+- 在线担保交易：原石购买「确认收货后到账」，支持取消退款与购买奖励
+- 商品 / 贴图发布性质、苏州区 / 北京区区域筛选、猫彩蛋跳转与头像旁成就系统
 - GitHub Actions PR 校验、受保护分支合并和服务器原子发布/回滚
 
 详细边界和降级顺序见 [`docs/architecture.md`](docs/architecture.md)、[`docs/search.md`](docs/search.md) 和 [`docs/recommendation.md`](docs/recommendation.md)。
@@ -103,6 +106,7 @@ Pull Request 通过 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 并�
 - [`docs/search.md`](docs/search.md) —— 关键词、语义与混合检索
 - [`docs/recommendation.md`](docs/recommendation.md) —— 推荐策略、灰度和指标
 - [`docs/operations.md`](docs/operations.md) —— 发布、监控、降级和回滚
+- [`docs/admin-guide.md`](docs/admin-guide.md) —— 管理员操作说明（奖励、币种、自营、彩蛋、成就）
 
 ## 许可证
 
