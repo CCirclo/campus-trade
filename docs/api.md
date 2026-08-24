@@ -385,6 +385,8 @@
 | GET | `/api/admin/users` | 用户列表 |
 | POST | `/api/admin/users` | 创建用户 |
 | PATCH | `/api/admin/users/:id` | 编辑用户 |
+| PATCH | `/api/admin/users/:id/verification` | 手动认证/取消认证本校区普通用户 |
+| PUT | `/api/admin/users/:id/campus-manager` | 总管理员直接授予/撤销所选校区负责人权限 |
 | DELETE | `/api/admin/users/:id` | 删除用户 |
 | GET | `/api/admin/items` | 商品列表 |
 | PATCH | `/api/admin/items/:id` | 调整商品状态 |
