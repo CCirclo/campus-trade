@@ -83,6 +83,7 @@ function UserEditor({ mode, user, onClose, onSaved, onError }: { mode: 'create' 
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [role, setRole] = useState<'user' | 'admin'>(user?.role || 'user');
   const [adminVerified, setAdminVerified] = useState(user?.adminVerified || false);
+  const [campusManager,setCampusManager]=useState(user?.isCampusManager||false);
   const [selfOperated, setSelfOperated] = useState(user?.selfOperated || false);
   const [schools,setSchools]=useState<School[]>([]);
   const [isSuper,setIsSuper]=useState(false);
@@ -98,7 +99,7 @@ function UserEditor({ mode, user, onClose, onSaved, onError }: { mode: 'create' 
     e.preventDefault(); setBusy(true);
     try {
       if (mode === 'create') await post('/api/admin/users', { email, password, nickname, role, adminVerified, selfOperated, schoolId,campusId });
-      else await api(`/api/admin/users/${user!.id}`, { method: 'PATCH', body: JSON.stringify({ nickname, role, adminVerified, selfOperated, schoolId,campusId }) });
+      else {await api(`/api/admin/users/${user!.id}`, { method: 'PATCH', body: JSON.stringify({ nickname, role, adminVerified, selfOperated, schoolId,campusId }) });if(!isSuper&&user!.role==='user')await api(`/api/admin/users/${user!.id}/verification`,{method:'PATCH',body:JSON.stringify({adminVerified})});if(isSuper&&campusManager!==user!.isCampusManager)await api(`/api/admin/users/${user!.id}/campus-manager`,{method:'PUT',body:JSON.stringify({schoolId,campusId,enabled:campusManager})})}
       onSaved();
     } catch (e) { onError(e instanceof Error ? e.message : '保存失败'); } finally { setBusy(false); }
   };
@@ -112,7 +113,9 @@ function UserEditor({ mode, user, onClose, onSaved, onError }: { mode: 'create' 
       <label>昵称<input value={nickname} onChange={e => setNickname(e.target.value)} required minLength={2} maxLength={24} /></label>
       <label>学校<select value={schoolId} onChange={e=>setSchoolId(e.target.value)} required disabled={!isSuper&&Boolean(user)}>{schools.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
       <label>校区<select value={campusId} onChange={e=>setCampusId(e.target.value)} required>{selectedSchool?.campuses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-      {isSuper&&<><label>角色<select value={role} onChange={e => setRole(e.target.value as 'user' | 'admin')}><option value="user">普通用户</option><option value="admin">管理员</option></select></label><label className="admin-check"><input type="checkbox" checked={adminVerified} onChange={e => setAdminVerified(e.target.checked)} /><span><b>管理员手动认证</b><small>勾选后该用户获得发布、评论、发消息等认证权限；学校负责人请在“学校”页面指定。</small></span></label></>}
+      {isSuper&&<label>角色<select value={role} onChange={e => setRole(e.target.value as 'user' | 'admin')}><option value="user">普通用户</option><option value="admin">管理员</option></select></label>}
+      {(!user?.isSuperAdmin&&(isSuper||mode==='create'||user?.role==='user'))&&<label className="admin-check"><input type="checkbox" checked={adminVerified} onChange={e => setAdminVerified(e.target.checked)} /><span><b>管理员手动认证</b><small>校区管理员可认证自己负责校区的普通用户；勾选后可发布、评论和发送消息。</small></span></label>}
+      {isSuper&&mode==='edit'&&!user?.isSuperAdmin&&<label className="admin-check"><input type="checkbox" checked={campusManager} onChange={e=>setCampusManager(e.target.checked)}/><span><b>设为所选校区负责人</b><small>无需再到学校管理设置；保存后自动获得该校区管理权限和手动认证。</small></span></label>}
       {isSuper&&<label className="admin-check"><input type="checkbox" checked={selfOperated} onChange={e => setSelfOperated(e.target.checked)} /><span><b>自营账号</b><small>勾选后该用户可发布“原石”计价的兑换商品。</small></span></label>}
       {effective && <div className="admin-cert-note ok">✓ 该用户将显示为<b>已认证</b>，可正常发布与交易</div>}
       {!effective && <div className="admin-cert-note warn">未认证：该邮箱不是受支持的校园邮箱，需勾选「管理员手动认证」后才会获得认证权限</div>}

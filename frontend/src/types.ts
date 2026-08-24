@@ -10,7 +10,7 @@ export type ItemCardSnapshot = { id:number; title:string; price:number; currency
 export type ChatMessage = { id:number; content:string; type:'text'|'item_card'; item:ItemCardSnapshot|null; createdAt:string; mine:boolean; sender:{nickname:string;avatarUrl:string} };
 
 export type AdminStats = { users:number; items:number; reports:number; reportsPending:number; schools:number };
-export type AdminUser = { id:number; email:string; nickname:string; avatarUrl:string; role:'user'|'admin'; verified:boolean; emailVerified:boolean; adminVerified:boolean; selfOperated:boolean; campusVerified:boolean; isSchoolManager:boolean; isSuperAdmin:boolean; schoolId:string; campusId:string; schoolName:string; campusName:string; emailMessageNotifications:boolean; createdAt:string; lastSeenAt:string|null; itemCount:number };
+export type AdminUser = { id:number; email:string; nickname:string; avatarUrl:string; role:'user'|'admin'; verified:boolean; emailVerified:boolean; adminVerified:boolean; selfOperated:boolean; campusVerified:boolean; isSchoolManager:boolean; isCampusManager:boolean; isSuperAdmin:boolean; schoolId:string; campusId:string; schoolName:string; campusName:string; emailMessageNotifications:boolean; createdAt:string; lastSeenAt:string|null; itemCount:number };
 export type AdminManager={id:number;email:string;nickname:string};
 export type AdminSchool = { id:string; name:string; active:boolean; emailDomains:string[]; campuses:Array<Campus & {active:boolean;manager?:AdminManager|null}>; manager:AdminManager|null };
 export type AdminContext = { isSuperAdmin:boolean; superAdminEmail:string; managedSchoolIds:string[]; managedCampuses:Array<{schoolId:string;campusId:string}>; schools:AdminSchool[] };
