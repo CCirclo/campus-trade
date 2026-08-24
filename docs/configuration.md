@@ -11,6 +11,7 @@
 | `PORT` | `8787` | API 本机端口 |
 | `APP_ORIGIN` | 完整 HTTPS 源 | 状态变更请求的 Origin 校验 |
 | `VITE_BASE_PATH` | `/campus-trade/` | 前端部署子路径 |
+| `SCHOOL_CATALOG_JSON` | 内置人大苏州目录 | 仅用于空数据库首次初始化；之后通过 Admin 管理数据库目录 |
 | `MYSQL_*` | 独立库与最小权限账户 | 连接数默认 10，小内存机可调低 |
 
 ## 隐私与推荐

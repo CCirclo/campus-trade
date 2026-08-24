@@ -1,7 +1,7 @@
 import {createHmac,timingSafeEqual} from 'node:crypto';
 
 export interface RecommendationCandidate {
-  id:number; userId:number; schoolId:string; status:string; category:string; price:number; createdAt:string|Date;
+  id:number; userId:number; schoolId:string; campusId:string; status:string; category:string; price:number; createdAt:string|Date;
   impressions:number; clicks:number; favorites:number; conversations:number; recentlyExposed:boolean;
 }
 export interface RecommendationSignals {categoryAffinity:Readonly<Record<string,number>>;preferredPrice:number|null}
@@ -33,8 +33,8 @@ function allowedByDiversity<T extends RecommendationCandidate>(picked:RankedReco
   const sellers=picked.slice(-config.maxSellerConsecutive);if(sellers.length===config.maxSellerConsecutive&&sellers.every(row=>row.candidate.userId===next.candidate.userId))return false;
   const window=picked.slice(-(config.diversityWindow-1)),same=window.filter(row=>row.candidate.category===next.candidate.category).length;return same<config.maxCategoryPerWindow;
 }
-export function rankCandidates<T extends RecommendationCandidate>(candidates:readonly T[],signals:RecommendationSignals,config:RecommendationConfig,options:{schoolId:string;userId?:number;seed:string;now?:Date}){
-  const eligible=candidates.filter(row=>row.schoolId===options.schoolId&&row.status==='在售'&&row.userId!==options.userId);
+export function rankCandidates<T extends RecommendationCandidate>(candidates:readonly T[],signals:RecommendationSignals,config:RecommendationConfig,options:{schoolId:string;campusId:string;userId?:number;seed:string;now?:Date}){
+  const eligible=candidates.filter(row=>row.schoolId===options.schoolId&&row.campusId===options.campusId&&row.status==='在售'&&row.userId!==options.userId);
   const remaining=eligible.map(row=>scoreCandidate(row,signals,config,options.seed,options.now)).sort((a,b)=>b.score.total-a.score.total||b.candidate.id-a.candidate.id),picked:RankedRecommendation<T>[]=[];
   while(remaining.length){let index=remaining.findIndex(row=>allowedByDiversity(picked,row,config));if(index<0)index=0;picked.push(remaining.splice(index,1)[0]);}
   return picked;

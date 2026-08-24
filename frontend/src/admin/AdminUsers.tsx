@@ -2,14 +2,14 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ChevronLeft, ChevronRight, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { api, post } from '../api';
 import { formatTimestamp } from '../time';
-import type { AdminUser } from '../types';
+import type { AdminContext, AdminUser, School } from '../types';
 
 const fallbackAvatar = 'https://api.dicebear.com/9.x/notionists/svg?seed=campus';
 const pageSize = 20;
 
 function authBadge(u: AdminUser): { text: string; cls: string; title: string } {
-  if (u.campusVerified) return { text: u.adminVerified ? '手动认证' : '校园认证', cls: 'ok', title: u.adminVerified ? '管理员手动认证，可发布商品、评论与发消息' : '已通过 @ruc.edu.cn 邮箱验证，可发布商品、评论与发消息' };
-  if (u.emailVerified) return { text: '邮箱已验证', cls: 'muted', title: '邮箱已验证，但非 @ruc.edu.cn 且未手动认证，暂不能发布' };
+  if (u.campusVerified) return { text: u.adminVerified ? '手动认证' : '校园认证', cls: 'ok', title: u.adminVerified ? '管理员手动认证，可发布商品、评论与发消息' : '已通过受支持的校园邮箱验证，可发布商品、评论与发消息' };
+  if (u.emailVerified) return { text: '邮箱已验证', cls: 'muted', title: '邮箱已验证，但非受支持校园邮箱 且未手动认证，暂不能发布' };
   return { text: '未认证', cls: 'muted', title: '未认证，暂不能发布商品、评论与发消息' };
 }
 
@@ -62,8 +62,8 @@ export default function AdminUsers() {
           {loading ? <tr><td colSpan={6} className="admin-table-empty">加载中…</td></tr> :
             !users.length ? <tr><td colSpan={6} className="admin-table-empty">没有找到符合条件的用户</td></tr> :
             users.map(u => <tr key={u.id}>
-              <td><div className="admin-cell-user"><img src={u.avatarUrl || fallbackAvatar} alt="" /><span><b>{u.nickname}</b><small>{u.email}</small></span></div></td>
-              <td><span className={`admin-pill ${u.role === 'admin' ? 'admin' : 'user'}`}>{u.role === 'admin' ? '管理员' : '用户'}</span></td>
+              <td><div className="admin-cell-user"><img src={u.avatarUrl || fallbackAvatar} alt="" /><span><b>{u.nickname}</b><small>{u.email}</small><small>{u.schoolName} · {u.campusName}</small></span></div></td>
+              <td><span className={`admin-pill ${u.role === 'admin' ? 'admin' : 'user'}`}>{u.isSuperAdmin?'平台总管理员':u.isSchoolManager?'学校负责人':u.role === 'admin' ? '管理员' : '用户'}</span></td>
               <td><span className={`admin-pill ${authBadge(u).cls}`} title={authBadge(u).title}>{authBadge(u).text}</span>{u.selfOperated && <span className="admin-pill self">自营</span>}</td>
               <td>{u.itemCount}</td>
               <td className="admin-muted">{formatTimestamp(u.createdAt)}</td>
@@ -84,14 +84,21 @@ function UserEditor({ mode, user, onClose, onSaved, onError }: { mode: 'create' 
   const [role, setRole] = useState<'user' | 'admin'>(user?.role || 'user');
   const [adminVerified, setAdminVerified] = useState(user?.adminVerified || false);
   const [selfOperated, setSelfOperated] = useState(user?.selfOperated || false);
+  const [schools,setSchools]=useState<School[]>([]);
+  const [isSuper,setIsSuper]=useState(false);
+  const [schoolId,setSchoolId]=useState(user?.schoolId||'');
+  const [campusId,setCampusId]=useState(user?.campusId||'');
   const [busy, setBusy] = useState(false);
   const emailNow = (mode === 'edit' && user ? user.email : email).trim().toLowerCase();
-  const effective = adminVerified || emailNow.endsWith('@ruc.edu.cn');
+  const effective = adminVerified || schools.some(s=>s.emailDomains.some(d=>emailNow.endsWith(`@${d}`)));
+  const selectedSchool=schools.find(s=>s.id===schoolId);
+  useEffect(()=>{api<AdminContext>('/api/admin/context').then(d=>{const next=d.schools.map(s=>({id:s.id,name:s.name,emailDomains:s.emailDomains,campuses:s.campuses.filter(c=>c.active).map(c=>({id:c.id,name:c.name}))}));setSchools(next);setIsSuper(d.isSuperAdmin);setSchoolId(value=>value||next[0]?.id||'');setCampusId(value=>value||next[0]?.campuses[0]?.id||'')}).catch(()=>{})},[]);
+  useEffect(()=>{if(selectedSchool&&!selectedSchool.campuses.some(c=>c.id===campusId))setCampusId(selectedSchool.campuses[0]?.id||'')},[schoolId,schools.length]);
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true);
     try {
-      if (mode === 'create') await post('/api/admin/users', { email, password, nickname, role, adminVerified, selfOperated });
-      else await api(`/api/admin/users/${user!.id}`, { method: 'PATCH', body: JSON.stringify({ nickname, role, adminVerified, selfOperated }) });
+      if (mode === 'create') await post('/api/admin/users', { email, password, nickname, role, adminVerified, selfOperated, schoolId,campusId });
+      else await api(`/api/admin/users/${user!.id}`, { method: 'PATCH', body: JSON.stringify({ nickname, role, adminVerified, selfOperated, schoolId,campusId }) });
       onSaved();
     } catch (e) { onError(e instanceof Error ? e.message : '保存失败'); } finally { setBusy(false); }
   };
@@ -103,11 +110,12 @@ function UserEditor({ mode, user, onClose, onSaved, onError }: { mode: 'create' 
         <label>初始密码<input type="text" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} placeholder="至少 8 位" /></label>
       </>}
       <label>昵称<input value={nickname} onChange={e => setNickname(e.target.value)} required minLength={2} maxLength={24} /></label>
-      <label>角色<select value={role} onChange={e => setRole(e.target.value as 'user' | 'admin')}><option value="user">普通用户</option><option value="admin">管理员</option></select></label>
-      <label className="admin-check"><input type="checkbox" checked={adminVerified} onChange={e => setAdminVerified(e.target.checked)} /><span><b>管理员手动认证</b><small>勾选后该用户获得发布、评论、发消息等认证权限，可随时取消；@ruc.edu.cn 校园邮箱用户默认已认证。</small></span></label>
-      <label className="admin-check"><input type="checkbox" checked={selfOperated} onChange={e => setSelfOperated(e.target.checked)} /><span><b>自营账号</b><small>勾选后该用户可发布「原石」计价的兑换商品；取消后只能以人民币发布。</small></span></label>
+      <label>学校<select value={schoolId} onChange={e=>setSchoolId(e.target.value)} required disabled={!isSuper&&Boolean(user)}>{schools.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+      <label>校区<select value={campusId} onChange={e=>setCampusId(e.target.value)} required>{selectedSchool?.campuses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+      {isSuper&&<><label>角色<select value={role} onChange={e => setRole(e.target.value as 'user' | 'admin')}><option value="user">普通用户</option><option value="admin">管理员</option></select></label><label className="admin-check"><input type="checkbox" checked={adminVerified} onChange={e => setAdminVerified(e.target.checked)} /><span><b>管理员手动认证</b><small>勾选后该用户获得发布、评论、发消息等认证权限；学校负责人请在“学校”页面指定。</small></span></label></>}
+      {isSuper&&<label className="admin-check"><input type="checkbox" checked={selfOperated} onChange={e => setSelfOperated(e.target.checked)} /><span><b>自营账号</b><small>勾选后该用户可发布“原石”计价的兑换商品。</small></span></label>}
       {effective && <div className="admin-cert-note ok">✓ 该用户将显示为<b>已认证</b>，可正常发布与交易</div>}
-      {!effective && <div className="admin-cert-note warn">未认证：该邮箱不是 @ruc.edu.cn 校园邮箱，需勾选「管理员手动认证」后才会获得认证权限</div>}
+      {!effective && <div className="admin-cert-note warn">未认证：该邮箱不是受支持的校园邮箱，需勾选「管理员手动认证」后才会获得认证权限</div>}
     </div>
     <div className="report-actions"><button type="button" className="button secondary" onClick={onClose}>取消</button><button type="submit" className="button primary" disabled={busy}>{busy ? '保存中…' : '保存'}</button></div>
   </form></div>;

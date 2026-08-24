@@ -23,7 +23,7 @@
 - 商品状态：`在售` / `已售出` / `已下架`
 - 分类：商品分类列表（`categories`，见后端 `security.ts`）
 - 成色：`conditions`（见后端 `security.ts`）
-- 学校：`school_id`（当前默认 `ruc_suzhou`）
+- 学校与校区：独立的 `schoolId` / `campusId`（默认 `ruc` / `suzhou`）。学校由邮箱目录决定，普通用户不可修改；校区可在原学校内切换。
 
 ---
 
@@ -32,6 +32,7 @@
 | 方法 | 路径 | 说明 | 鉴权 |
 | --- | --- | --- | --- |
 | GET | `/api/auth/me` | 获取当前登录用户 | 可选 |
+| GET | `/api/campuses` | 获取公开学校/校区目录及默认范围 | 无 |
 | POST | `/api/auth/email-code` | 发送邮箱注册验证码 | 无 |
 | POST | `/api/auth/register` | 邮箱验证码注册 | 无 |
 | POST | `/api/auth/login` | 邮箱密码登录 | 无 |
@@ -121,7 +122,8 @@
 | `keyword` | 标题/类目/描述关键词（≤40 字符） |
 | `category` | 分类 |
 | `condition` | 成色 |
-| `schoolId` | 学校（默认 `ruc_suzhou`） |
+| `schoolId` | 学校 ID；已登录时忽略此参数，采用会话用户学校 |
+| `campusId` | 校区 ID；必须属于学校；已登录时采用会话用户校区 |
 | `sort` | `latest`（默认）/ `priceAsc` / `priceDesc` |
 | `page` | 页码，从 1 开始（默认 1；`(page - 1) × pageSize` 不得超过 10,000） |
 | `pageSize` | 每页数量（默认 20，最大 100） |
@@ -247,7 +249,7 @@
 
 ### PUT `/api/me/profile`
 
-请求体：`{ "nickname"（≥2 字符）, "wechatId", "emailMessageNotifications": true|false }`
+请求体：`{ "nickname"（≥2 字符）, "wechatId", "campusId", "emailMessageNotifications": true|false }`。`schoolId` 即使传入也不会被普通资料接口修改；`campusId` 必须属于用户原学校。
 
 响应：`{ "user": { ... } }`
 
@@ -362,11 +364,19 @@
 
 ---
 
-## 8. 管理后台 Admin — `/api/admin`（需 `role=admin`）
+## 8. 管理后台 Admin — `/api/admin`
+
+平台总管理员固定为 `2025202211@ruc.edu.cn`，拥有全部学校范围。其他 admin 仅拥有负责人关系指定的学校范围；兼容旧 admin 时回退到账号自身学校。权限由后端逐接口校验。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/admin/stats` | 平台统计 |
+| GET | `/api/admin/context` | 当前管理员级别、授权学校和学校详情 |
+| GET | `/api/admin/schools` | 授权学校、域名、校区和负责人 |
+| POST | `/api/admin/schools` | 新增学校（仅总管理员） |
+| PATCH | `/api/admin/schools/:id` | 修改名称、邮箱域名、添加或更新校区（仅总管理员） |
+| GET | `/api/admin/schools/:id/candidates` | 负责人候选用户（仅总管理员） |
+| PUT | `/api/admin/schools/:id/manager` | 指定学校负责人（仅总管理员） |
 | GET | `/api/admin/users` | 用户列表 |
 | POST | `/api/admin/users` | 创建用户 |
 | PATCH | `/api/admin/users/:id` | 编辑用户 |
@@ -377,7 +387,7 @@
 | GET | `/api/admin/reports` | 举报列表 |
 | PATCH | `/api/admin/reports/:id` | 处置举报 |
 
-> 管理员账号通过环境变量 `ADMIN_EMAILS`（启动时自动提升）或脚本 `backend/scripts/make-admin.ts` / `create-admin.ts` 设置。
+> 总管理员可在学校页面指定该学校已有用户为负责人，系统会赋予其 `admin` 角色和负责人关系。普通管理员的用户、商品、举报和统计接口均按学校过滤，不能依靠修改请求参数越权。
 
 ---
 

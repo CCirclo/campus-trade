@@ -1,5 +1,7 @@
 import mysql, { type ResultSetHeader, type RowDataPacket } from 'mysql2/promise';
 import { isCampusEmail } from './security.js';
+import {campusScopeNames,defaultCampusScope,loadSchoolCatalog,migrateLegacyScope,replaceSchoolCatalog,schoolForEmail,type SchoolDefinition} from './campus-catalog.js';
+import {isSuperAdminEmail} from './admin-permissions.js';
 
 export const pool = mysql.createPool({
   host: process.env.MYSQL_HOST || '127.0.0.1',
@@ -32,13 +34,37 @@ export async function run(sql: string, values: any[] = []) {
 
 export async function initDatabase() {
   const statements = [
+    `CREATE TABLE IF NOT EXISTS schools (
+      id VARCHAR(40) NOT NULL PRIMARY KEY,
+      name VARCHAR(120) NOT NULL,
+      active TINYINT(1) NOT NULL DEFAULT 1,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS campuses (
+      id VARCHAR(40) NOT NULL,
+      school_id VARCHAR(40) NOT NULL,
+      name VARCHAR(120) NOT NULL,
+      active TINYINT(1) NOT NULL DEFAULT 1,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (school_id,id),
+      CONSTRAINT fk_campuses_school FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS school_email_domains (
+      domain VARCHAR(160) NOT NULL PRIMARY KEY,
+      school_id VARCHAR(40) NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_school_domains_school FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
+      INDEX idx_school_domains_school (school_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     `CREATE TABLE IF NOT EXISTS users (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
       email VARCHAR(160) NOT NULL UNIQUE,
       password_hash VARCHAR(255) NULL,
       nickname VARCHAR(24) NOT NULL,
       avatar_url VARCHAR(800) NOT NULL DEFAULT '',
-      school_id VARCHAR(40) NOT NULL DEFAULT 'ruc_suzhou',
+      school_id VARCHAR(40) NOT NULL DEFAULT 'ruc',
+      campus_id VARCHAR(40) NOT NULL DEFAULT 'suzhou',
       wechat_id VARCHAR(40) NOT NULL DEFAULT '',
       verified TINYINT(1) NOT NULL DEFAULT 0,
       email_verified TINYINT(1) NOT NULL DEFAULT 0,
@@ -64,6 +90,17 @@ export async function initDatabase() {
       CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       INDEX idx_sessions_expiry (expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS school_admins (
+      school_id VARCHAR(40) NOT NULL,
+      user_id BIGINT UNSIGNED NOT NULL,
+      assigned_by BIGINT UNSIGNED NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (school_id,user_id),
+      CONSTRAINT fk_school_admins_school FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
+      CONSTRAINT fk_school_admins_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_school_admins_assigner FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
+      INDEX idx_school_admins_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     `CREATE TABLE IF NOT EXISTS runtime_secrets (
       secret_name VARCHAR(32) NOT NULL PRIMARY KEY,
       secret_value CHAR(64) NOT NULL,
@@ -74,6 +111,8 @@ export async function initDatabase() {
       user_id BIGINT UNSIGNED NOT NULL,
       title VARCHAR(80) NOT NULL,
       price DECIMAL(10,2) NOT NULL,
+      currency VARCHAR(20) NOT NULL DEFAULT 'cny',
+      rmb_price DECIMAL(10,2) NULL,
       images JSON NOT NULL,
       regions JSON NULL,
       category VARCHAR(20) NOT NULL,
@@ -82,11 +121,12 @@ export async function initDatabase() {
       item_condition VARCHAR(20) NOT NULL,
       description TEXT NOT NULL,
       school_id VARCHAR(40) NOT NULL,
+      campus_id VARCHAR(40) NOT NULL,
       status VARCHAR(20) NOT NULL DEFAULT '在售',
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       CONSTRAINT fk_items_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      INDEX idx_items_school_status (school_id, status, created_at)
+      INDEX idx_items_scope_status (school_id, campus_id, status, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     `CREATE TABLE IF NOT EXISTS item_embeddings (
       item_id BIGINT UNSIGNED NOT NULL,
@@ -252,6 +292,8 @@ export async function initDatabase() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   ];
   for (const statement of statements) await pool.query(statement);
+  await initializeSchoolCatalog();
+  await migrateCampusColumns();
   await migrateAdminColumns();
   if(!await columnExists('email_codes','purpose'))await pool.query(`ALTER TABLE email_codes ADD COLUMN purpose VARCHAR(20) NOT NULL DEFAULT 'register' AFTER attempts`);
   if(!await columnExists('items','currency'))await pool.query(`ALTER TABLE items ADD COLUMN currency VARCHAR(20) NOT NULL DEFAULT 'cny' AFTER price`);
@@ -267,8 +309,36 @@ export async function initDatabase() {
   if (process.env.SEED_DEMO_DATA === 'true') await seedDemoData();
 }
 
+export async function refreshSchoolCatalog(){
+  const schools=await all('SELECT id,name FROM schools WHERE active=1 ORDER BY created_at,id'),campuses=await all('SELECT school_id,id,name FROM campuses WHERE active=1 ORDER BY created_at,id'),domains=await all('SELECT school_id,domain FROM school_email_domains ORDER BY domain');
+  const catalog:SchoolDefinition[]=schools.map(s=>({id:String(s.id),name:String(s.name),emailDomains:domains.filter(d=>d.school_id===s.id).map(d=>String(d.domain)),campuses:campuses.filter(c=>c.school_id===s.id).map(c=>({id:String(c.id),name:String(c.name)}))})).filter(s=>s.campuses.length>0);
+  if(catalog.length)replaceSchoolCatalog(catalog);
+  return catalog;
+}
+
+async function initializeSchoolCatalog(){
+  const count=await one('SELECT COUNT(*) count FROM schools');
+  if(!Number(count?.count)){
+    for(const school of loadSchoolCatalog()){
+      await run('INSERT INTO schools (id,name) VALUES (?,?)',[school.id,school.name]);
+      for(const campus of school.campuses)await run('INSERT INTO campuses (school_id,id,name) VALUES (?,?,?)',[school.id,campus.id,campus.name]);
+      for(const domain of school.emailDomains)await run('INSERT INTO school_email_domains (domain,school_id) VALUES (?,?)',[domain,school.id]);
+    }
+  }
+  await refreshSchoolCatalog();
+}
+
 async function columnExists(table:string,column:string){return Boolean(await one(`SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?`,[table,column]));}
 async function indexExists(table:string,index:string){return Boolean(await one(`SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND INDEX_NAME=?`,[table,index]));}
+
+async function migrateCampusColumns(){
+  const fallback=defaultCampusScope();
+  if(!await columnExists('users','campus_id'))await pool.query(`ALTER TABLE users ADD COLUMN campus_id VARCHAR(40) NOT NULL DEFAULT '${fallback.campusId}' AFTER school_id`);
+  if(!await columnExists('items','campus_id'))await pool.query(`ALTER TABLE items ADD COLUMN campus_id VARCHAR(40) NOT NULL DEFAULT '${fallback.campusId}' AFTER school_id`);
+  await run(`UPDATE users SET school_id='ruc',campus_id='suzhou' WHERE school_id='ruc_suzhou'`);
+  await run(`UPDATE items SET school_id='ruc',campus_id='suzhou' WHERE school_id='ruc_suzhou'`);
+  if(!await indexExists('items','idx_items_scope_status'))await pool.query('ALTER TABLE items ADD INDEX idx_items_scope_status (school_id,campus_id,status,created_at)');
+}
 
 async function migrateAdminColumns(){
   if(!await columnExists('users','role'))await pool.query(`ALTER TABLE users ADD COLUMN role VARCHAR(10) NOT NULL DEFAULT 'user' AFTER email_message_notifications`);
@@ -282,6 +352,7 @@ async function migrateLedgerAmount(){
 }
 
 async function promoteAdminsFromEnv(){
+  await run(`UPDATE users SET role='admin',admin_verified=1 WHERE email=?`,['2025202211@ruc.edu.cn']);
   const emails=(process.env.ADMIN_EMAILS||'').split(',').map(e=>e.trim().toLowerCase()).filter(Boolean);
   for(const email of emails){
     await run(`UPDATE users SET role='admin' WHERE email=? AND role<>'admin'`,[email]);
@@ -307,8 +378,8 @@ async function seedDemoData() {
   if (Number(existing?.count) > 0) return;
   let seller = await one('SELECT id FROM users WHERE email = ?', ['demo-seller@campus.local']);
   if (!seller) {
-    const result = await run(`INSERT INTO users (email,nickname,avatar_url,school_id,verified) VALUES (?,?,?,?,1)`,
-      ['demo-seller@campus.local','苏园好物铺','https://api.dicebear.com/9.x/notionists/svg?seed=market','ruc_suzhou']);
+    const result = await run(`INSERT INTO users (email,nickname,avatar_url,school_id,campus_id,verified) VALUES (?,?,?,?,?,1)`,
+      ['demo-seller@campus.local','苏园好物铺','https://api.dicebear.com/9.x/notionists/svg?seed=market','ruc','suzhou']);
     seller = { id: result.insertId } as DbRow;
   }
   const products = [
@@ -317,20 +388,22 @@ async function seedDemoData() {
     ['宿舍桌面暖光台灯',45,'生活用品','九成新','三档亮度，Type-C 供电，适合夜间阅读。','https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=900&q=80'],
   ];
   for (const [title,price,category,itemCondition,description,image] of products) {
-    await run(`INSERT INTO items (user_id,title,price,images,category,item_condition,description,school_id) VALUES (?,?,?,?,?,?,?,'ruc_suzhou')`,
+    await run(`INSERT INTO items (user_id,title,price,images,category,item_condition,description,school_id,campus_id) VALUES (?,?,?,?,?,?,?,'ruc','suzhou')`,
       [seller.id,title,price,JSON.stringify([image]),category,itemCondition,description]);
   }
 }
 
 export function publicUser(row: Record<string, unknown> | undefined) {
   if (!row) return null;
+  const scope=migrateLegacyScope(row.school_id,row.campus_id),names=campusScopeNames(scope.schoolId,scope.campusId);
   return {
     id:Number(row.id), email:String(row.email || ''), nickname:String(row.nickname), avatarUrl:String(row.avatar_url || ''),
-    schoolId:String(row.school_id), wechatId:String(row.wechat_id || ''), verified:Boolean(row.verified),
-    campusVerified:Boolean(row.admin_verified) || (Boolean(row.email_verified) && isCampusEmail(row.email)),
+    schoolId:scope.schoolId,campusId:scope.campusId,...names,wechatId:String(row.wechat_id || ''), verified:Boolean(row.verified),
+    campusVerified:Boolean(row.admin_verified) || (Boolean(row.email_verified) && schoolForEmail(row.email)?.id===scope.schoolId),
     emailMessageNotifications:Boolean(row.email_message_notifications),
     adminVerified:Boolean(row.admin_verified),
     selfOperated:Boolean(row.self_operated),
+    isSuperAdmin:isSuperAdminEmail(row.email),
     role:String(row.role || 'user') === 'admin' ? 'admin' as const : 'user' as const,
   };
 }
@@ -338,16 +411,17 @@ export function publicUser(row: Record<string, unknown> | undefined) {
 export function mapItem(row: Record<string, unknown>) {
   const rawImages = row.images;
   const images = Array.isArray(rawImages) ? rawImages : JSON.parse(String(rawImages || '[]'));
-  const rawRegions = row.regions;
-  let parsedRegions: unknown = [];
-  if (Array.isArray(rawRegions)) parsedRegions = rawRegions;
-  else { try { parsedRegions = JSON.parse(String(rawRegions || '[]')); } catch { parsedRegions = []; } }
-  const regionNames = (Array.isArray(parsedRegions) ? parsedRegions : []).map(v => String(v)).filter(Boolean);
-  const regions = regionNames.length ? regionNames : ['苏州区', '北京区'];
+  const rawRegions=row.regions;
+  let parsedRegions:unknown=[];
+  if(Array.isArray(rawRegions))parsedRegions=rawRegions;
+  else{try{parsedRegions=JSON.parse(String(rawRegions||'[]'))}catch{parsedRegions=[]}}
+  const regionNames=(Array.isArray(parsedRegions)?parsedRegions:[]).map(v=>String(v)).filter(Boolean);
+  const regions=regionNames.length?regionNames:['苏州区','北京区'];
+  const scope=migrateLegacyScope(row.school_id,row.campus_id),names=campusScopeNames(scope.schoolId,scope.campusId);
   return {
     id:Number(row.id), userId:Number(row.user_id), title:String(row.title), price:Number(row.price), images,
-    category:String(row.category), condition:String(row.item_condition), kind:String(row.kind || '商品'), easterEgg:row.easter_egg?String(row.easter_egg):null, description:String(row.description || ''),
-    schoolId:String(row.school_id), status:String(row.status), currency:String(row.currency || 'cny'), rmbPrice:row.rmb_price?Number(row.rmb_price):null, regions, createdAt:dateIso(row.created_at), updatedAt:dateIso(row.updated_at),
+    category:String(row.category), condition:String(row.item_condition),kind:String(row.kind||'商品'),easterEgg:row.easter_egg?String(row.easter_egg):null,description:String(row.description || ''),
+    schoolId:scope.schoolId,campusId:scope.campusId,...names,status:String(row.status),currency:String(row.currency||'cny'),rmbPrice:row.rmb_price?Number(row.rmb_price):null,regions,createdAt:dateIso(row.created_at), updatedAt:dateIso(row.updated_at),
     seller: row.seller_id ? { id:Number(row.seller_id), nickname:String(row.seller_nickname), avatarUrl:String(row.seller_avatar || ''), verified:Boolean(row.seller_email_verified)&&(isCampusEmail(row.seller_email)||Boolean(row.seller_admin_verified)) } : undefined,
   };
 }

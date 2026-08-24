@@ -52,6 +52,7 @@ export default function AdminReports() {
               <img src={r.item.image || ''} alt="" /><span><b>{r.item.title}</b><small>¥{r.item.price} · 当前状态：{r.item.status}</small></span><ExternalLink />
             </Link>
             <div className="admin-report-meta">
+              <span className="admin-pill admin">{r.schoolName} · {r.campusName}</span>
               <span className="admin-pill muted">举报人：{r.reporter.nickname}（{r.reporter.email}）</span>
               <span className="admin-pill reason">{r.reason}</span>
               <span className="admin-pill ok">提交于 {formatTimestamp(r.createdAt)}</span>

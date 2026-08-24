@@ -8,8 +8,8 @@ export const hybridSearchEnabled=()=>config.enabled&&process.env.HYBRID_SEARCH_E
 async function queryVector(keyword:string,waitIfBusy:boolean){const hit=cache.get(keyword),now=Date.now();if(hit&&now-hit.at<CACHE_TTL)return hit.vector;const [vector]=await new EmbeddingClient(config).embed([keyword],{priority:'search',waitIfBusy});if(cache.size>=CACHE_MAX)cache.delete(cache.keys().next().value!);cache.set(keyword,{at:now,vector});return vector;}
 function embedding(raw:unknown){try{const value=Array.isArray(raw)?raw:JSON.parse(String(raw));return Array.isArray(value)&&value.every(Number.isFinite)?value as number[]:null}catch{return null}}
 
-export async function hybridItemIds(input:{keyword:string;schoolId:string;category?:string;condition?:string}){
-  const keyword=normalizeKeyword(input.keyword),built=buildKeywordSearch(keyword),filters=[`i.school_id=?`,`i.status='在售'`],filterArgs:unknown[]=[input.schoolId];
+export async function hybridItemIds(input:{keyword:string;schoolId:string;campusId:string;category?:string;condition?:string}){
+  const keyword=normalizeKeyword(input.keyword),built=buildKeywordSearch(keyword),filters=[`i.school_id=?`,`i.campus_id=?`,`i.status='在售'`],filterArgs:unknown[]=[input.schoolId,input.campusId];
   if(input.category){filters.push('i.category=?');filterArgs.push(input.category)}if(input.condition){filters.push('i.item_condition=?');filterArgs.push(input.condition)}const where=filters.join(' AND ');
   const keywordRows=await all<DbRow>(`SELECT i.id,i.title,${built.scoreExpr} keyword_score FROM items i WHERE ${where} AND ${built.whereClause} ORDER BY keyword_score DESC,i.created_at DESC,i.id DESC LIMIT 200`,[...built.scoreArgs,...filterArgs,...built.whereArgs]);
   let vectorRows:{id:number;score:number}[]=[];

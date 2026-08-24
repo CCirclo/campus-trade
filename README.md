@@ -1,5 +1,13 @@
 # 校园闲鱼（campus-trade）
 
+## 多学校与多校区
+
+Web 与后端支持多个学校、每所学校多个校区。账号和商品分别保存 `school_id` 与 `campus_id`：学校由受支持的校园邮箱域名确定，普通用户不能在个人资料中修改；校区可在同一学校内随时切换。商品保存发布时的学校/校区快照，切换个人校区不会移动历史商品。
+
+学校目录保存在数据库的 `schools`、`campuses`、`school_email_domains` 表中，并由管理后台维护；`SCHOOL_CATALOG_JSON` 只在首次初始化空数据库时作为种子。客户端不能自行提交任意学校。已有 `ruc_suzhou` 会幂等迁移为 `school_id=ruc`、`campus_id=suzhou`。
+
+`2025202211@ruc.edu.cn` 是唯一平台总管理员，可查看全部学校并指定学校负责人。其他管理员只能查看和管理自己学校的数据。商品固定归属于发布时的学校与校区，其他校区无法查看；商品主人可在自己的主页和“我的发布”中按校区查看全部历史商品。本次改造只覆盖数据库、后端和 Web，iOS/Android 暂未同步。
+
 面向校内用户的多端二手闲置交易平台。仓库包含 React Web、SwiftUI iOS、Jetpack Compose Android、Node.js API、MySQL 数据层，以及搜索、推荐、钱包和自动部署能力。
 
 - 线上地址：<https://20250821cdcdifc.top/campus-trade/>

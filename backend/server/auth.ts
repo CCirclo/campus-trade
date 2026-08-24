@@ -31,7 +31,7 @@ export async function optionalAuth(req: AuthedRequest,_res:Response,next:NextFun
 export function requireAuth(req:AuthedRequest,res:Response,next:NextFunction){ if(!req.user)return res.status(401).json({error:'请先登录后继续'}); next(); }
 export function requireCampus(req:AuthedRequest,res:Response,next:NextFunction){
   if(!req.user)return res.status(401).json({error:'请先登录后继续'});
-  if(!req.user.campusVerified)return res.status(403).json({error:'你不是校园认证用户。只有通过 @ruc.edu.cn 邮箱验证的账号才能进行此操作。',code:'CAMPUS_EMAIL_REQUIRED'});
+  if(!req.user.campusVerified)return res.status(403).json({error:'你不是校园认证用户。只有通过平台已配置学校邮箱验证的账号才能进行此操作。',code:'CAMPUS_EMAIL_REQUIRED'});
   next();
 }
 export const hashPassword=(password:string)=>bcrypt.hash(password,12);

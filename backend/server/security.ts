@@ -24,7 +24,15 @@ export function validEmail(value: string) {
 }
 
 export function isCampusEmail(value: unknown) {
-  return normalizeEmail(value).endsWith('@ruc.edu.cn');
+  // Kept as a compatibility helper for callers that only need a boolean.
+  // The import is intentionally lazy at call time through the catalog-free domain list
+  // to avoid a security.ts <-> campus-catalog.ts module cycle.
+  const domain=normalizeEmail(value).split('@')[1]||'';
+  try{
+    const configured=JSON.parse(process.env.SCHOOL_CATALOG_JSON||'null') as Array<{emailDomains?:string[]}>|null;
+    const domains=configured?.flatMap(s=>s.emailDomains||[])||['ruc.edu.cn'];
+    return domains.some(d=>domain===d);
+  }catch{return domain==='ruc.edu.cn'}
 }
 
 export function cleanText(value: unknown, max = 200) {

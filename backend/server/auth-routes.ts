@@ -3,9 +3,10 @@ import { randomInt } from 'node:crypto';
 import { clearSession,createSession,hashPassword,requireAuth,type AuthedRequest,verifyPassword } from './auth.js';
 import { one,publicUser,run } from './db.js';
 import { mailConfigured,sendPasswordResetCode,sendVerificationCode } from './mail.js';
-import { cleanText,consumeRateLimit,hashToken,isCampusEmail,normalizeEmail,SESSION_COOKIE,safeEqual,validEmail } from './security.js';
-import { getRewardSettings } from './settings.js';
-import { grantCurrency } from './wallet.js';
+import { cleanText,consumeRateLimit,hashToken,normalizeEmail,SESSION_COOKIE,safeEqual,validEmail } from './security.js';
+import {campusBelongsToSchool,defaultCampusScope,schoolForEmail} from './campus-catalog.js';
+import {getRewardSettings} from './settings.js';
+import {grantCurrency} from './wallet.js';
 
 export const authRouter=Router();
 const rateKey=(req:AuthedRequest,action:string)=>`${action}:${req.ip||req.socket.remoteAddress||'unknown'}`;
@@ -39,11 +40,11 @@ authRouter.post('/register',async(req:AuthedRequest,res,next)=>{try{
     if(verification)await run('UPDATE email_codes SET attempts=attempts+1 WHERE email=?',[email]);
     return res.status(400).json({error:'邮箱验证码无效或已过期'});
   }
-  const result=await run(`INSERT INTO users (email,password_hash,nickname,school_id,verified,email_verified,email_message_notifications) VALUES (?,?,?,'ruc_suzhou',1,1,?)`,[email,await hashPassword(password),nickname,emailNotifications?1:0]);
+  const matchedSchool=schoolForEmail(email),fallback=defaultCampusScope(),schoolId=matchedSchool?.id||fallback.schoolId,campusId=cleanText(req.body.campusId,40)||fallback.campusId;
+  if(!campusBelongsToSchool(schoolId,campusId))return res.status(400).json({error:'请选择该学校的有效校区'});
+  const result=await run(`INSERT INTO users (email,password_hash,nickname,school_id,campus_id,verified,email_verified,email_message_notifications) VALUES (?,?,?,?,?,1,1,?)`,[email,await hashPassword(password),nickname,schoolId,campusId,emailNotifications?1:0]);
   await run('DELETE FROM email_codes WHERE email=?',[email]);
-  await createSession(res,result.insertId);
-  await grantSignupReward(result.insertId,email);
-  const user=await one('SELECT * FROM users WHERE id=?',[result.insertId]); res.status(201).json({user:publicUser(user)});
+  await createSession(res,result.insertId);await grantSignupReward(result.insertId,email);const user=await one('SELECT * FROM users WHERE id=?',[result.insertId]);res.status(201).json({user:publicUser(user)});
 }catch(e){next(e)}});
 
 authRouter.post('/login',async(req:AuthedRequest,res,next)=>{try{
@@ -105,7 +106,7 @@ async function grantSignupReward(userId:number,email:string){
   try{
     const settings=await getRewardSettings();
     if(!settings.signupEnabled)return;
-    if(settings.signupCampusOnly&&!isCampusEmail(email))return;
+    if(settings.signupCampusOnly&&!schoolForEmail(email))return;
     const operator='系统';
     for(const currency of ['lungmen','originium'] as const){
       const amount=settings.signupBonus[currency];

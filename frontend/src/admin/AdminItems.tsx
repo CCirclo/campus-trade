@@ -65,12 +65,13 @@ export default function AdminItems() {
     {error && <div className="form-error">{error}</div>}
     <div className="admin-table-wrap">
       <table className="admin-table">
-        <thead><tr><th>商品</th><th>卖家</th><th>价格</th><th>状态</th><th>性质</th><th>彩蛋</th><th>发布时间</th><th>操作</th></tr></thead>
+        <thead><tr><th>商品</th><th>学校 / 校区</th><th>卖家</th><th>价格</th><th>状态</th><th>性质</th><th>彩蛋</th><th>发布时间</th><th>操作</th></tr></thead>
         <tbody>
-          {loading ? <tr><td colSpan={8} className="admin-table-empty">加载中…</td></tr> :
-            !items.length ? <tr><td colSpan={8} className="admin-table-empty">没有找到符合条件的商品</td></tr> :
+          {loading ? <tr><td colSpan={9} className="admin-table-empty">加载中…</td></tr> :
+            !items.length ? <tr><td colSpan={9} className="admin-table-empty">没有找到符合条件的商品</td></tr> :
             items.map(item => <tr key={item.id}>
               <td><div className="admin-cell-item"><img src={item.images[0] || ''} alt="" /><span><b>{item.title}</b><small>{item.category} · {item.condition}</small></span></div></td>
+              <td><b>{item.schoolName}</b><br/><small className="admin-muted">{item.campusName}</small></td>
               <td><div className="admin-cell-user"><span><b>{item.seller?.nickname || '未知'}</b><small>#{item.userId}</small></span></div></td>
               <td><strong className={`admin-price${item.kind === '贴图' ? ' pic-price' : ''}`}>{item.kind === '贴图' ? item.price : formatItemPrices(item)}</strong></td>
               <td><select className={`admin-status-select ${item.status === '在售' ? 'selling' : item.status === '已售出' ? 'sold' : 'off'}`} value={item.status} onChange={e => void changeStatus(item, e.target.value)}>{statuses.map(s => <option key={s}>{s}</option>)}</select></td>

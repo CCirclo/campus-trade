@@ -4,6 +4,7 @@ import { stdin as input, stdout as output } from 'node:process';
 import { hashPassword } from '../server/auth.js';
 import { one, pool, run } from '../server/db.js';
 import { normalizeEmail, validEmail } from '../server/security.js';
+import {defaultCampusScope,schoolForEmail} from '../server/campus-catalog.js';
 
 const email = normalizeEmail(process.argv[2]) || '';
 if (!email || !validEmail(email)) {
@@ -42,9 +43,10 @@ if (password.length < 8 || password.length > 72) {
 }
 
 const nickname = '管理员';
+const matched=schoolForEmail(email),fallback=defaultCampusScope(),schoolId=matched?.id||fallback.schoolId,campusId=matched?.campuses[0]?.id||fallback.campusId;
 const result = await run(
-  `INSERT INTO users (email,password_hash,nickname,school_id,verified,email_verified,role) VALUES (?,?,?,'ruc_suzhou',1,1,'admin')`,
-  [email, await hashPassword(password), nickname],
+  `INSERT INTO users (email,password_hash,nickname,school_id,campus_id,verified,email_verified,admin_verified,role) VALUES (?,?,?,?,?,1,1,1,'admin')`,
+  [email, await hashPassword(password), nickname,schoolId,campusId],
 );
 console.log(`已创建管理员账号 ${email}（id=${result.insertId}），初始昵称「管理员」，可登录后修改。`);
 await pool.end();
