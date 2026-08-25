@@ -34,7 +34,7 @@ function allowedByDiversity<T extends RecommendationCandidate>(picked:RankedReco
   const window=picked.slice(-(config.diversityWindow-1)),same=window.filter(row=>row.candidate.category===next.candidate.category).length;return same<config.maxCategoryPerWindow;
 }
 export function rankCandidates<T extends RecommendationCandidate>(candidates:readonly T[],signals:RecommendationSignals,config:RecommendationConfig,options:{schoolId:string;campusId:string;userId?:number;seed:string;now?:Date}){
-  const eligible=candidates.filter(row=>row.schoolId===options.schoolId&&row.campusId===options.campusId&&row.status==='在售'&&row.userId!==options.userId);
+  const eligible=candidates.filter(row=>row.schoolId===options.schoolId&&row.campusId===options.campusId&&row.status==='在售');
   const remaining=eligible.map(row=>scoreCandidate(row,signals,config,options.seed,options.now)).sort((a,b)=>b.score.total-a.score.total||b.candidate.id-a.candidate.id),picked:RankedRecommendation<T>[]=[];
   while(remaining.length){let index=remaining.findIndex(row=>allowedByDiversity(picked,row,config));if(index<0)index=0;picked.push(remaining.splice(index,1)[0]);}
   return picked;

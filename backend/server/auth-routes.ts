@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { randomInt } from 'node:crypto';
 import { clearSession,createSession,hashPassword,requireAuth,type AuthedRequest,verifyPassword } from './auth.js';
-import { one,publicUser,run } from './db.js';
+import { one,pool,publicUser,run } from './db.js';
 import { mailConfigured,sendPasswordResetCode,sendVerificationCode } from './mail.js';
 import { cleanText,consumeRateLimit,hashToken,normalizeEmail,SESSION_COOKIE,safeEqual,validEmail } from './security.js';
 import {campusBelongsToSchool,defaultCampusScope,schoolForEmail} from './campus-catalog.js';
 import {getRewardSettings} from './settings.js';
-import {grantCurrency} from './wallet.js';
+import {creditCurrency} from './wallet.js';
+import {FIRST_N_ORIGINIUM,nextCounter,tieredRewardAmount} from './reward-policy.js';
 
 export const authRouter=Router();
 const rateKey=(req:AuthedRequest,action:string)=>`${action}:${req.ip||req.socket.remoteAddress||'unknown'}`;
@@ -108,9 +109,19 @@ async function grantSignupReward(userId:number,email:string){
     if(!settings.signupEnabled)return;
     if(settings.signupCampusOnly&&!schoolForEmail(email))return;
     const operator='系统';
-    for(const currency of ['lungmen','originium'] as const){
-      const amount=settings.signupBonus[currency];
-      if(amount>0)await grantCurrency({userId,currency,amount,reason:'注册奖励',operator});
+    const conn=await pool.getConnection();
+    try{
+      await conn.beginTransaction();
+      const ordinal=await nextCounter(conn,'signup');
+      const lungmen=tieredRewardAmount(ordinal);
+      if(lungmen>0)await creditCurrency(conn,{userId,currency:'lungmen',amount:lungmen,reason:'注册奖励',operator});
+      if(ordinal<=FIRST_N_ORIGINIUM)await creditCurrency(conn,{userId,currency:'originium',amount:1,reason:'注册奖励（前 100 名创世结晶）',operator});
+      await conn.commit();
+    }catch(error){
+      await conn.rollback();
+      throw error;
+    }finally{
+      conn.release();
     }
   }catch(error){console.error('Signup reward failed:',error)}
 }

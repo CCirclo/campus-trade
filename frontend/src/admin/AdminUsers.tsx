@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Coins, Eye, Package, Pencil, Plus, RefreshCw, Search, ShoppingBag, Trash2, X } from 'lucide-react';
 import { api, post } from '../api';
 import { formatTimestamp } from '../time';
-import type { AdminContext, AdminUser, School } from '../types';
+import type { AdminContext, AdminUser, Item, School } from '../types';
 
 const fallbackAvatar = 'https://api.dicebear.com/9.x/notionists/svg?seed=campus';
 const pageSize = 20;
@@ -20,9 +20,13 @@ export default function AdminUsers() {
   const [q, setQ] = useState('');
   const [keyword, setKeyword] = useState('');
   const [role, setRole] = useState('');
+  const [context, setContext] = useState<AdminContext | null>(null);
+  const [schoolId, setSchoolId] = useState('');
+  const [campusId, setCampusId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editor, setEditor] = useState<{ mode: 'create' } | { mode: 'edit'; user: AdminUser } | null>(null);
+  const [detail, setDetail] = useState<AdminUser | null>(null);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const load = useCallback(() => {
@@ -30,12 +34,15 @@ export default function AdminUsers() {
     const params = new URLSearchParams({ page: String(page) });
     if (keyword) params.set('q', keyword);
     if (role) params.set('role', role);
+    if (schoolId) params.set('schoolId', schoolId);
+    if (campusId) params.set('campusId', campusId);
     api<{ users: AdminUser[]; total: number }>(`/api/admin/users?${params}`)
       .then(d => { setUsers(d.users); setTotal(d.total); })
       .catch(e => setError(e instanceof Error ? e.message : '加载失败'))
       .finally(() => setLoading(false));
-  }, [page, keyword, role]);
+  }, [page, keyword, role, schoolId, campusId]);
   useEffect(load, [load]);
+  useEffect(() => { api<AdminContext>('/api/admin/context').then(setContext).catch(() => {}); }, []);
 
   const remove = async (u: AdminUser) => {
     if (!window.confirm(`确定删除用户「${u.nickname}」（${u.email}）？该用户的商品、评论等数据会一并删除，且无法恢复。`)) return;
@@ -44,13 +51,14 @@ export default function AdminUsers() {
   };
 
   return <div className="admin-page">
-    <div className="admin-page-title admin-title-row"><div><span className="eyebrow">USERS</span><h1>用户管理</h1><p>共 {total} 位用户，可创建、编辑或删除账号。</p></div><button className="button primary" onClick={() => setEditor({ mode: 'create' })}><Plus />创建用户</button></div>
+    <div className="admin-page-title admin-title-row"><div><span className="eyebrow">USERS</span><h1>用户管理</h1><p>{campusId ? '当前筛选单个校区' : '默认显示全部可管理校区'} · 共 {total} 位用户。</p></div><button className="button primary" onClick={() => setEditor({ mode: 'create' })}><Plus />创建用户</button></div>
     <div className="admin-toolbar">
       <form className="admin-search" onSubmit={e => { e.preventDefault(); setPage(1); setKeyword(q); }}><Search /><input value={q} onChange={e => setQ(e.target.value)} placeholder="搜索邮箱或昵称" /><button>搜索</button></form>
       <div className="admin-filters">
         <button className={!role ? 'active' : ''} onClick={() => { setRole(''); setPage(1); }}>全部</button>
         <button className={role === 'user' ? 'active' : ''} onClick={() => { setRole('user'); setPage(1); }}>普通用户</button>
         <button className={role === 'admin' ? 'active' : ''} onClick={() => { setRole('admin'); setPage(1); }}>管理员</button>
+        <label className="admin-campus-filter-label">校区<select value={campusId ? `${schoolId}:${campusId}` : ''} onChange={e => { const v = e.target.value; if (!v) { setSchoolId(''); setCampusId(''); } else { const [s, c] = v.split(':'); setSchoolId(s); setCampusId(c); } setPage(1); }}><option value="">全部校区</option>{context?.schools.map(s => <optgroup key={s.id} label={s.name}>{s.campuses.filter(c => c.active).map(c => <option key={c.id} value={`${s.id}:${c.id}`}>{c.name}</option>)}</optgroup>)}</select></label>
         <button className="admin-refresh" onClick={() => load()} title="刷新"><RefreshCw /></button>
       </div>
     </div>
@@ -67,13 +75,63 @@ export default function AdminUsers() {
               <td><span className={`admin-pill ${authBadge(u).cls}`} title={authBadge(u).title}>{authBadge(u).text}</span>{u.selfOperated && <span className="admin-pill self">自营</span>}</td>
               <td>{u.itemCount}</td>
               <td className="admin-muted">{formatTimestamp(u.createdAt)}</td>
-              <td><div className="admin-row-actions"><button className="admin-icon-btn" title="编辑" onClick={() => setEditor({ mode: 'edit', user: u })}><Pencil /></button><button className="admin-icon-btn danger" title="删除" onClick={() => void remove(u)}><Trash2 /></button></div></td>
+              <td><div className="admin-row-actions"><button className="admin-icon-btn" title="详情" onClick={() => setDetail(u)}><Eye /></button><button className="admin-icon-btn" title="编辑" onClick={() => setEditor({ mode: 'edit', user: u })}><Pencil /></button><button className="admin-icon-btn danger" title="删除" onClick={() => void remove(u)}><Trash2 /></button></div></td>
             </tr>)}
         </tbody>
       </table>
     </div>
     {totalPages > 1 && <div className="admin-pagination"><button disabled={page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft />上一页</button><span>{page} / {totalPages}</span><button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>下一页<ChevronRight /></button></div>}
     {editor && <UserEditor key={editor.mode === 'edit' ? editor.user.id : 'new'} mode={editor.mode} user={editor.mode === 'edit' ? editor.user : undefined} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); load(); }} onError={setError} />}
+    {detail && <UserDetail user={detail} onClose={() => setDetail(null)} />}
+  </div>;
+}
+
+type AdminWallet = { user: { id: number; email: string; nickname: string }; balances: { currency: string; balance: number }[]; entries: { id: number; currency: string; amount: number; balanceAfter: number; reason: string; operator: string; createdAt: string }[] };
+type AdminOrder = { id: number; itemTitle: string; currency: string; amount: number; status: string; role: 'buyer' | 'seller'; buyer: { nickname: string }; seller: { nickname: string }; createdAt: string; completedAt: string | null };
+
+const currencyName = (code: string) => code === 'lungmen' ? '原石' : code === 'originium' ? '创世结晶' : code;
+
+function UserDetail({ user, onClose }: { user: AdminUser; onClose: () => void }) {
+  const [wallet, setWallet] = useState<AdminWallet | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let alive = true;
+    setLoading(true); setError('');
+    Promise.all([
+      api<AdminWallet>(`/api/admin/users/${user.id}/wallet`),
+      api<{ items: Item[] }>(`/api/admin/users/${user.id}/items`),
+      api<{ orders: AdminOrder[] }>(`/api/admin/users/${user.id}/orders`),
+    ]).then(([w, it, od]) => { if (alive) { setWallet(w); setItems(it.items); setOrders(od.orders); } })
+      .catch(e => { if (alive) setError(e instanceof Error ? e.message : '加载失败'); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [user.id]);
+
+  return <div className="report-backdrop" onClick={onClose}>
+    <div className="report-modal user-detail-modal" onClick={e => e.stopPropagation()}>
+      <div className="report-head">
+        <div><b>{user.nickname}</b><small>{user.email} · {user.schoolName} · {user.campusName} · 发布 {user.itemCount} 件</small></div>
+        <button type="button" onClick={onClose}><X /></button>
+      </div>
+      {loading ? <p className="admin-table-empty">加载中…</p> : error ? <p className="admin-table-empty">{error}</p> : <div className="user-detail-body">
+        <section className="admin-section">
+          <div className="admin-section-head"><Coins /><div><b>钱包</b><small>原石与创世结晶余额</small></div></div>
+          <div className="admin-stat-grid">{wallet && wallet.balances.length ? wallet.balances.map(b => <div className="admin-stat-card" key={b.currency}><span className="admin-stat-icon"><Coins /></span><div><b>{b.balance}</b><small>{currencyName(b.currency)}</small></div></div>) : <div className="admin-stat-card"><span className="admin-stat-icon"><Coins /></span><div><b>0</b><small>暂无余额</small></div></div>}</div>
+          {wallet && wallet.entries.length > 0 && <table className="admin-table"><thead><tr><th>时间</th><th>币种</th><th>金额</th><th>余额</th><th>原因</th><th>操作者</th></tr></thead><tbody>{wallet.entries.map(e => <tr key={e.id}><td className="admin-muted">{formatTimestamp(e.createdAt)}</td><td>{currencyName(e.currency)}</td><td>{e.amount>0?'+':''}{e.amount}</td><td>{e.balanceAfter}</td><td>{e.reason}</td><td>{e.operator}</td></tr>)}</tbody></table>}
+        </section>
+        <section className="admin-section">
+          <div className="admin-section-head"><Package /><div><b>发布商品</b><small>共 {items.length} 件</small></div></div>
+          {items.length ? <table className="admin-table"><thead><tr><th>商品</th><th>价格</th><th>校区</th><th>状态</th><th>发布时间</th></tr></thead><tbody>{items.map(it => <tr key={it.id}><td><b>{it.title}</b><small className="admin-muted" style={{display:'block'}}>{it.category} · {it.condition}</small></td><td>{it.currency === 'cny' ? '¥' + it.price : it.price + ' 原石'}</td><td>{it.campusName}</td><td>{it.status}</td><td className="admin-muted">{formatTimestamp(it.createdAt)}</td></tr>)}</tbody></table> : <p className="admin-table-empty">该用户还没有发布商品</p>}
+        </section>
+        <section className="admin-section">
+          <div className="admin-section-head"><ShoppingBag /><div><b>交易订单</b><small>共 {orders.length} 笔</small></div></div>
+          {orders.length ? <table className="admin-table"><thead><tr><th>方向</th><th>商品</th><th>金额</th><th>状态</th><th>时间</th></tr></thead><tbody>{orders.map(o => <tr key={o.id}><td><span className="admin-pill">{o.role === 'buyer' ? '买入' : '卖出'}</span></td><td>{o.itemTitle || '—'}</td><td>{o.amount} {currencyName(o.currency)}</td><td>{o.status}</td><td className="admin-muted">{formatTimestamp(o.completedAt || o.createdAt)}</td></tr>)}</tbody></table> : <p className="admin-table-empty">该用户还没有交易订单</p>}
+        </section>
+      </div>}
+    </div>
   </div>;
 }
 
