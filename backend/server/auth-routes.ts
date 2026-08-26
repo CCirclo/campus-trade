@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { randomInt } from 'node:crypto';
 import { clearSession,createSession,hashPassword,requireAuth,type AuthedRequest,verifyPassword } from './auth.js';
-import { one,pool,publicUser,run } from './db.js';
+import { generateUsername,one,pool,publicUser,run } from './db.js';
 import { mailConfigured,sendPasswordResetCode,sendVerificationCode } from './mail.js';
 import { cleanText,consumeRateLimit,hashToken,normalizeEmail,SESSION_COOKIE,safeEqual,validEmail } from './security.js';
 import {campusBelongsToSchool,defaultCampusScope,schoolForEmail} from './campus-catalog.js';
@@ -43,15 +43,16 @@ authRouter.post('/register',async(req:AuthedRequest,res,next)=>{try{
   }
   const matchedSchool=schoolForEmail(email),fallback=defaultCampusScope(),schoolId=matchedSchool?.id||fallback.schoolId,campusId=cleanText(req.body.campusId,40)||fallback.campusId;
   if(!campusBelongsToSchool(schoolId,campusId))return res.status(400).json({error:'请选择该学校的有效校区'});
-  const result=await run(`INSERT INTO users (email,password_hash,nickname,school_id,campus_id,verified,email_verified,email_message_notifications) VALUES (?,?,?,?,?,1,1,?)`,[email,await hashPassword(password),nickname,schoolId,campusId,emailNotifications?1:0]);
+  const result=await run(`INSERT INTO users (username,email,password_hash,nickname,school_id,campus_id,verified,email_verified,email_message_notifications) VALUES (?,?,?,?,?,?,1,1,?)`,[await generateUsername(),email,await hashPassword(password),nickname,schoolId,campusId,emailNotifications?1:0]);
   await run('DELETE FROM email_codes WHERE email=?',[email]);
   await createSession(res,result.insertId);await grantSignupReward(result.insertId,email);const user=await one('SELECT * FROM users WHERE id=?',[result.insertId]);res.status(201).json({user:publicUser(user)});
 }catch(e){next(e)}});
 
 authRouter.post('/login',async(req:AuthedRequest,res,next)=>{try{
   if(!consumeRateLimit(rateKey(req,'login'),10))return res.status(429).json({error:'登录尝试过多，请稍后再试'});
-  const row=await one('SELECT * FROM users WHERE email=?',[normalizeEmail(req.body.email)]); const password=String(req.body.password||'');
-  if(!row?.password_hash||!(await verifyPassword(password,String(row.password_hash))))return res.status(401).json({error:'邮箱或密码不正确'});
+  const account=cleanText(req.body.account||req.body.email,160); const password=String(req.body.password||'');
+  const row=await one('SELECT * FROM users WHERE username=? OR email=?',[account,normalizeEmail(account)]);
+  if(!row?.password_hash||!(await verifyPassword(password,String(row.password_hash))))return res.status(401).json({error:'账号或密码不正确'});
   await createSession(res,Number(row.id)); res.json({user:publicUser(row)});
 }catch(e){next(e)}});
 

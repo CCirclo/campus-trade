@@ -1,0 +1,22 @@
+.auth-entry-list{display:grid;gap:10px;margin-top:8px}
+.auth-entry-item{display:flex;align-items:center;gap:12px;width:100%;padding:15px 16px;border:1px solid #e3e9f1;border-radius:16px;background:#fff;text-align:left;color:inherit;transition:border-color .15s,box-shadow .15s,transform .15s}
+.auth-entry-item:hover{border-color:#b9cff5;box-shadow:0 10px 22px rgba(37,99,235,.08)}
+.auth-entry-item:active{transform:scale(.98)}
+.auth-entry-icon{display:grid;width:46px;height:46px;flex:0 0 auto;place-items:center;border-radius:13px;background:var(--brand-soft);font-size:22px}
+.auth-entry-text{display:flex;min-width:0;flex:1;flex-direction:column}
+.auth-entry-text b{font-size:14px}
+.auth-entry-text small{margin-top:3px;color:var(--muted);font-size:11px;line-height:1.55}
+.auth-entry-item>svg{flex:0 0 auto;width:18px;color:#a5adba}
+.auth-entry-item.guest{border-style:dashed;border-color:#d9e0e8}
+.auth-entry-item.guest .auth-entry-icon{background:#f3f5f8}
+.admin-wechat-reveal{grid-column:1/-1;padding:14px 15px;border:1px solid #ffe6b3;border-radius:14px;background:#fffaf0}
+.admin-wechat-reveal b{font-size:13px}
+.admin-wechat-id{margin:7px 0;font-size:16px;font-weight:850;color:#b45309}
+.admin-wechat-reveal small{color:var(--muted);font-size:11px;line-height:1.6}
+.bind-email-card{display:grid;gap:10px;margin-top:14px;padding:16px;border:1px solid var(--line);border-radius:16px;background:#fff}
+.bind-email-card .field-heading{display:flex;align-items:baseline;justify-content:space-between}
+.bind-email-card .field-heading b{font-size:15px}
+.bind-email-card .field-heading small{color:var(--muted);font-size:10px}
+.bind-email-card .custom-location{display:flex;gap:8px}
+.bind-email-card .custom-location input{flex:1;min-width:0;min-height:44px;padding:0 12px;border:1px solid #dce1e8;border-radius:11px;background:#fff}
+.bind-email-card .custom-location input:focus{outline:0;border-color:#8bb1fa}

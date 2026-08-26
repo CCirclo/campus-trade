@@ -91,7 +91,7 @@ test('avatar crop geometry stays square and clamps dragging',()=>{
 });
 
 test('public seller profiles expose only privacy-safe fields',()=>{
-  const profile=publicSellerProfile({id:7,nickname:'同学',avatar_url:'avatar.jpg',email:'student@ruc.edu.cn',email_verified:1,school_id:'ruc',campus_id:'suzhou',wechat_id:'private',last_seen_at:'private',password_hash:'private'});
-  assert.deepEqual(profile,{id:7,nickname:'同学',avatarUrl:'avatar.jpg',schoolId:'ruc',campusId:'suzhou',schoolName:'中国人民大学',campusName:'苏州校区',campusVerified:true});
-  assert.deepEqual(Object.keys(profile),['id','nickname','avatarUrl','schoolId','campusId','schoolName','campusName','campusVerified']);
+  const profile=publicSellerProfile({id:7,username:'12345678',nickname:'同学',avatar_url:'avatar.jpg',email:'student@ruc.edu.cn',email_verified:1,school_id:'ruc',campus_id:'suzhou',wechat_id:'private',last_seen_at:'private',password_hash:'private'});
+  assert.deepEqual(profile,{id:7,username:'12345678',nickname:'同学',avatarUrl:'avatar.jpg',schoolId:'ruc',campusId:'suzhou',schoolName:'中国人民大学',campusName:'苏州校区',campusVerified:true});
+  assert.deepEqual(Object.keys(profile),['id','username','nickname','avatarUrl','schoolId','campusId','schoolName','campusName','campusVerified']);
 });
