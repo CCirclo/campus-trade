@@ -165,7 +165,7 @@ function UserEditor({ mode, user, onClose, onSaved, onError }: { mode: 'create' 
     <div className="report-head"><div><b>{mode === 'create' ? '创建用户' : '编辑用户'}</b><small>{mode === 'create' ? '管理员直接创建账号，初始密码请自行告知对方。' : '修改昵称、角色与认证状态，保存后立即生效。'}</small></div><button type="button" onClick={onClose}><X /></button></div>
     <div className="admin-form-grid">
       {mode === 'create' && <>
-        <label>邮箱地址（可选）<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com（不填则无邮箱）" /></label>
+        <label>邮箱地址<input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="name@example.com" /></label>
         <label>初始密码<input type="text" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} placeholder="至少 8 位" /></label><div className="admin-cert-note ok">✓ 编号将随机自动生成；昵称留空时自动使用编号</div>
       </>}
       <label>昵称（可选）<input value={nickname} onChange={e => setNickname(e.target.value)} maxLength={24} placeholder="留空则使用编号作为昵称" /></label>
