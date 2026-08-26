@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Route, Routes } from 'react-router-dom';
-import { ArrowLeft, Coins, FileCheck2, Flag, LayoutDashboard, LogOut, Package, School, ShieldCheck, Users } from 'lucide-react';
+import { ArrowLeft, Coins, FileCheck2, Flag, LayoutDashboard, LogOut, Package, School, ShieldCheck, TrendingUp, Users } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import type { AdminContext, AdminStats } from '../types';
@@ -10,6 +10,7 @@ import AdminReports from './AdminReports';
 import AdminSchools from './AdminSchools';
 import AdminReward from './AdminReward';
 import AdminApplications from './AdminApplications';
+import AdminEconomy from './AdminEconomy';
 
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -48,6 +49,7 @@ export default function AdminApp() {
       <Link to="/admin" className="admin-brand"><span className="admin-brand-mark">管</span><span><b>校园闲置 · 管理后台</b><small>ADMIN CONSOLE</small></span></Link>
       <nav className="admin-nav" aria-label="管理后台导航">
         <NavLink to="/admin" end><LayoutDashboard />概览</NavLink>
+        <NavLink to="/admin/economy"><TrendingUp />经济</NavLink>
         <NavLink to="/admin/users"><Users />用户</NavLink>
         <NavLink to="/admin/schools"><School />学校</NavLink>
         <NavLink to="/admin/applications"><FileCheck2 />归属申请</NavLink>
@@ -64,6 +66,7 @@ export default function AdminApp() {
     <main className="admin-main">
       <Routes>
         <Route index element={<AdminDashboard stats={stats} />} />
+        <Route path="economy" element={<AdminEconomy />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="schools" element={<AdminSchools />} />
         <Route path="applications" element={<AdminApplications />} />

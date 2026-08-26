@@ -301,6 +301,28 @@ export async function initDatabase() {
       setting_value JSON NOT NULL,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS reward_counters (
+      counter_key VARCHAR(20) NOT NULL PRIMARY KEY,
+      counter_value BIGINT UNSIGNED NOT NULL DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS reward_daily_limits (
+      user_id BIGINT UNSIGNED NOT NULL,
+      activity VARCHAR(20) NOT NULL,
+      activity_day CHAR(10) NOT NULL,
+      daily_count INT UNSIGNED NOT NULL DEFAULT 0,
+      PRIMARY KEY (user_id, activity, activity_day),
+      CONSTRAINT fk_reward_daily_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS risk_flags (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      user_id BIGINT UNSIGNED NOT NULL,
+      kind VARCHAR(20) NOT NULL,
+      detail VARCHAR(255) NOT NULL DEFAULT '',
+      reviewed TINYINT(1) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_risk_flags_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      INDEX idx_risk_flags_reviewed (reviewed, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     `CREATE TABLE IF NOT EXISTS orders (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
       item_id BIGINT UNSIGNED NULL,

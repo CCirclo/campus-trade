@@ -1,7 +1,7 @@
 import type { PoolConnection } from 'mysql2/promise';
 import { pool } from './db.js';
 import { creditCurrency, debitCurrency } from './wallet.js';
-import { getRewardSettings } from './settings.js';
+import {DAILY_ACTIVITY_LIMIT,nextCounter,recordDailyActivity,shanghaiDay,tieredRewardAmount} from './reward-policy.js';
 import type { CurrencyCode } from './currency.js';
 
 export const ORDER_PAID = '待确认收货';
@@ -52,8 +52,11 @@ export async function confirmOrder(orderId: number, userId: number): Promise<voi
     if (Number(order.buyer_id) !== userId) throw new Error('只能确认自己的订单');
     if (String(order.status) !== ORDER_PAID) throw new Error('订单状态无效');
     await creditCurrency(conn, { userId: Number(order.seller_id), currency: String(order.currency) as CurrencyCode, amount: Number(order.amount), reason: `商品售出: ${String(order.item_title)}`, operator: '系统' });
-    const settings = await getRewardSettings();
-    if (settings.purchaseReward > 0) await creditCurrency(conn, { userId: Number(order.buyer_id), currency: 'lungmen', amount: settings.purchaseReward, reason: '购买奖励', operator: '系统' });
+    const used = await recordDailyActivity(conn, Number(order.buyer_id), 'purchase', shanghaiDay());
+    if (used <= DAILY_ACTIVITY_LIMIT) {
+      const amount = tieredRewardAmount(await nextCounter(conn, 'purchase'));
+      if (amount > 0) await creditCurrency(conn, { userId: Number(order.buyer_id), currency: 'lungmen', amount, reason: '购买奖励', operator: '系统' });
+    }
     await conn.execute(`UPDATE orders SET status=?,completed_at=CURRENT_TIMESTAMP WHERE id=?`, [ORDER_DONE, orderId]);
     await conn.commit();
   } catch (error) {

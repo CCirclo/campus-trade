@@ -9,9 +9,9 @@ import {optionalAuth,requireAuth,requireCampus,type AuthedRequest} from './auth.
 import {all,initDatabase,mapItem,one,pool,publicUser,run,dateIso} from './db.js';
 import {categories,cleanText,conditions,consumeRateLimit,isAllowedOrigin,kinds,regions,statuses,validPrice} from './security.js';
 import {CURRENCY_LIST,parseTradeCurrency} from './currency.js';
-import {getRewardSettings} from './settings.js';
 import {confirmOrder,cancelOrder,createOrder} from './orders.js';
-import {grantCurrency,InsufficientFundsError} from './wallet.js';
+import {creditCurrency,InsufficientFundsError} from './wallet.js';
+import {DAILY_ACTIVITY_LIMIT,nextCounter,recordDailyActivity,recordRiskFlagIfNeeded,shanghaiDay,tieredRewardAmount} from './reward-policy.js';
 import {cosConfigured,decodeObjectKey,signedObjectUrl,uploadToCos,validImageSignature} from './storage.js';
 import {canonicalPair,itemCardSnapshot,shouldSendItemCard} from './conversations.js';
 import {mailConfigured,sendAdminCommentNotification,sendAdminFeedbackNotification,sendNewMessageNotification} from './mail.js';
@@ -89,9 +89,39 @@ function itemPayload(body:Record<string,unknown>){
   if(title.length<3)throw new Error('商品标题至少需要 3 个字符');if(price===null)throw new Error('请输入有效价格');if(!categories.includes(category as typeof categories[number]))throw new Error('请选择有效分类');if(!conditions.includes(condition as typeof conditions[number]))throw new Error('请选择有效成色');if(currency===null)throw new Error('请选择有效的交易币种');if(currency!=='cny'&&(!Number.isInteger(price)||price<1))throw new Error('币种计价的价格需为正整数');if(regionList.length<1)throw new Error('请至少选择一个区域');if(!(kinds as readonly string[]).includes(kind))throw new Error('请选择有效的发布性质');return{title,price,category,condition,description,images,currency,rmbPrice,regions:regionList,kind};
 }
 
-app.post('/api/items',requireAuth,requireCampus,asyncRoute(async(req,res)=>{try{const d=itemPayload(req.body);if(d.currency!=='cny'&&!req.user!.selfOperated)return res.status(403).json({error:'只有自营账号可以发布原石兑换商品'});const result=await run(`INSERT INTO items (user_id,title,price,currency,rmb_price,regions,kind,images,category,item_condition,description,school_id,campus_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,[req.user!.id,d.title,d.price,d.currency,d.rmbPrice,JSON.stringify(d.regions),d.kind,JSON.stringify(d.images),d.category,d.condition,d.description,req.user!.schoolId,req.user!.campusId]);try{const settings=await getRewardSettings();if(settings.publishReward>0)await grantCurrency({userId:req.user!.id,currency:'lungmen',amount:settings.publishReward,reason:'发布奖励',operator:'系统'})}catch(error){console.error('Publish reward failed:',error)}let embeddingStatus='pending';try{embeddingStatus=await enqueueItemEmbedding(Number(result.insertId));kickEmbeddingWorker()}catch(error){console.error('Embedding enqueue failed:',error)}res.status(201).json({id:result.insertId,embeddingStatus})}catch(e){res.status(400).json({error:e instanceof Error?e.message:'商品信息无效'})}}));
+/** 管理员自动等同自营：自营账号或任意管理员都可发布原石计价商品。 */
+function canPublishLungmen(user:NonNullable<AuthedRequest['user']>){return user.selfOperated||user.role==='admin';}
+/** 解析发布校区：未提供时回退到当前校区；提供了但不属于当前学校时返回 null。 */
+function resolveItemCampus(req:AuthedRequest,body:Record<string,unknown>,fallback:string):string|null{
+  const campusId=cleanText(body.campusId,40);
+  if(!campusId)return fallback;
+  return campusBelongsToSchool(req.user!.schoolId,campusId)?campusId:null;
+}
+/** 发布奖励（分级递减 + 每日限次 + 风控检测），失败不影响发布本身。 */
+async function grantPublishReward(userId:number){
+  try{
+    const conn=await pool.getConnection();
+    try{
+      await conn.beginTransaction();
+      const used=await recordDailyActivity(conn,userId,'publish',shanghaiDay());
+      if(used<=DAILY_ACTIVITY_LIMIT){
+        const amount=tieredRewardAmount(await nextCounter(conn,'publish'));
+        if(amount>0)await creditCurrency(conn,{userId,currency:'lungmen',amount,reason:'发布奖励',operator:'系统'});
+      }
+      await recordRiskFlagIfNeeded(conn,userId);
+      await conn.commit();
+    }catch(error){
+      await conn.rollback();
+      throw error;
+    }finally{
+      conn.release();
+    }
+  }catch(error){console.error('Publish reward failed:',error)}
+}
 
-app.patch('/api/items/:id',requireAuth,requireCampus,asyncRoute(async(req,res)=>{const id=Number(req.params.id),existing=await one('SELECT * FROM items WHERE id=?',[id]);if(!existing)return res.status(404).json({error:'商品不存在'});if(Number(existing.user_id)!==req.user!.id)return res.status(403).json({error:'只能编辑自己发布的商品'});try{const d=itemPayload(req.body),status=cleanText(req.body.status,20)||String(existing.status);if(!statuses.includes(status as typeof statuses[number]))return res.status(400).json({error:'商品状态无效'});if(d.currency!=='cny'&&!req.user!.selfOperated)return res.status(403).json({error:'只有自营账号可以发布原石兑换商品'});await run(`UPDATE items SET title=?,price=?,currency=?,rmb_price=?,regions=?,kind=?,images=?,category=?,item_condition=?,description=?,status=? WHERE id=?`,[d.title,d.price,d.currency,d.rmbPrice,JSON.stringify(d.regions),d.kind,JSON.stringify(d.images),d.category,d.condition,d.description,status,id]);let embeddingStatus='pending';try{embeddingStatus=await enqueueItemEmbedding(id);kickEmbeddingWorker()}catch(error){console.error('Embedding enqueue failed:',error)}res.json({ok:true,embeddingStatus})}catch(e){res.status(400).json({error:e instanceof Error?e.message:'商品信息无效'})}}));
+app.post('/api/items',requireAuth,requireCampus,asyncRoute(async(req,res)=>{try{const d=itemPayload(req.body);if(d.currency!=='cny'&&!canPublishLungmen(req.user!))return res.status(403).json({error:'只有自营账号或管理员可以发布原石兑换商品'});const campusId=resolveItemCampus(req,req.body,req.user!.campusId);if(campusId===null)return res.status(400).json({error:'所选校区不属于当前学校'});const result=await run(`INSERT INTO items (user_id,title,price,currency,rmb_price,regions,kind,images,category,item_condition,description,school_id,campus_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,[req.user!.id,d.title,d.price,d.currency,d.rmbPrice,JSON.stringify(d.regions),d.kind,JSON.stringify(d.images),d.category,d.condition,d.description,req.user!.schoolId,campusId]);await grantPublishReward(req.user!.id);let embeddingStatus='pending';try{embeddingStatus=await enqueueItemEmbedding(Number(result.insertId));kickEmbeddingWorker()}catch(error){console.error('Embedding enqueue failed:',error)}res.status(201).json({id:result.insertId,embeddingStatus})}catch(e){res.status(400).json({error:e instanceof Error?e.message:'商品信息无效'})}}));
+
+app.patch('/api/items/:id',requireAuth,requireCampus,asyncRoute(async(req,res)=>{const id=Number(req.params.id),existing=await one('SELECT * FROM items WHERE id=?',[id]);if(!existing)return res.status(404).json({error:'商品不存在'});if(Number(existing.user_id)!==req.user!.id)return res.status(403).json({error:'只能编辑自己发布的商品'});try{const d=itemPayload(req.body),status=cleanText(req.body.status,20)||String(existing.status);if(!statuses.includes(status as typeof statuses[number]))return res.status(400).json({error:'商品状态无效'});if(d.currency!=='cny'&&!canPublishLungmen(req.user!))return res.status(403).json({error:'只有自营账号或管理员可以发布原石兑换商品'});const campusId=resolveItemCampus(req,req.body,String(existing.campus_id));if(campusId===null)return res.status(400).json({error:'所选校区不属于当前学校'});await run(`UPDATE items SET title=?,price=?,currency=?,rmb_price=?,regions=?,kind=?,images=?,category=?,item_condition=?,description=?,status=?,campus_id=? WHERE id=?`,[d.title,d.price,d.currency,d.rmbPrice,JSON.stringify(d.regions),d.kind,JSON.stringify(d.images),d.category,d.condition,d.description,status,campusId,id]);let embeddingStatus='pending';try{embeddingStatus=await enqueueItemEmbedding(id);kickEmbeddingWorker()}catch(error){console.error('Embedding enqueue failed:',error)}res.json({ok:true,embeddingStatus})}catch(e){res.status(400).json({error:e instanceof Error?e.message:'商品信息无效'})}}));
 
 app.post('/api/items/:id/favorite',requireAuth,requireCampus,asyncRoute(async(req,res)=>{const id=Number(req.params.id),item=await one('SELECT id,user_id,school_id,campus_id FROM items WHERE id=?',[id]);if(!item||!canViewScopedItem(req,item))return res.status(404).json({error:'商品不存在或不在当前校区'});const existing=await one('SELECT 1 FROM favorites WHERE user_id=? AND item_id=?',[req.user!.id,id]);if(existing)await run('DELETE FROM favorites WHERE user_id=? AND item_id=?',[req.user!.id,id]);else await run('INSERT INTO favorites (user_id,item_id) VALUES (?,?)',[req.user!.id,id]);void recordServerEvent({requestId:req.body.requestId,sessionId:req.body.sessionId,userId:req.user!.id,type:existing?'favorite_remove':'favorite_add',source:'item_detail',itemId:id,algorithmVersion:req.body.algorithmVersion}).catch(error=>console.error('Favorite event failed:',error));res.json({favorited:!existing})}));
 
