@@ -4,6 +4,7 @@ export function publicSellerProfile(row:Record<string,unknown>){
   const scope=migrateLegacyScope(row.school_id,row.campus_id),names=campusScopeNames(scope.schoolId,scope.campusId);
   return {
     id:Number(row.id),
+    username:String(row.username||''),
     nickname:String(row.nickname||'校园同学'),
     avatarUrl:String(row.avatar_url||''),
     schoolId:scope.schoolId,campusId:scope.campusId,...names,

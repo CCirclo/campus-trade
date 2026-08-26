@@ -1,16 +1,17 @@
 export type Campus = { id:string; name:string };
 export type School = { id:string; name:string; emailDomains:string[]; campuses:Campus[] };
-export type User = { id:number; email:string; nickname:string; avatarUrl:string; schoolId:string; campusId:string; schoolName:string; campusName:string; wechatId:string; verified:boolean; campusVerified:boolean; adminVerified:boolean; selfOperated:boolean; isSuperAdmin:boolean; emailMessageNotifications:boolean; role:'user'|'admin' };
+export type User = { id:number; username:string; email:string; nickname:string; avatarUrl:string; schoolId:string; campusId:string; schoolName:string; campusName:string; wechatId:string; verified:boolean; campusVerified:boolean; adminVerified:boolean; selfOperated:boolean; isSuperAdmin:boolean; emailMessageNotifications:boolean; role:'user'|'admin' };
 export type Seller = { id:number; nickname:string; avatarUrl:string; verified:boolean };
-export type PublicProfile = { id:number; nickname:string; avatarUrl:string; campusVerified:boolean; schoolId:string; campusId:string; schoolName:string; campusName:string };
+export type PublicProfile = { id:number; username:string; nickname:string; avatarUrl:string; campusVerified:boolean; schoolId:string; campusId:string; schoolName:string; campusName:string };
 export type Item = { id:number; userId:number; title:string; price:number; currency:string; rmbPrice:number|null; images:string[]; category:string; condition:string; kind:string; regions:string[]; easterEgg:string|null; description:string; schoolId:string; campusId:string; schoolName:string; campusName:string; status:string; createdAt:string; updatedAt:string; seller?:Seller; recommendationReasons?:string[] };
 export type Comment = { id:number; content:string; createdAt:string; author:Seller & { isSeller:boolean } };
 export type Conversation = { id:number; itemId:number; itemTitle:string; partner:{nickname:string;avatarUrl:string}; lastMessage:string; unreadCount:number; updatedAt:string };
 export type ItemCardSnapshot = { id:number; title:string; price:number; currency?:string; rmbPrice?:number|null; image:string; condition:string; status:string };
-export type ChatMessage = { id:number; content:string; type:'text'|'item_card'; item:ItemCardSnapshot|null; createdAt:string; mine:boolean; sender:{nickname:string;avatarUrl:string} };
+export type ErrandCardSnapshot = { id:number; title:string; cargoType:string; side:string; priceMin:number|null; priceMax:number|null; pickupLocations:string[]; deliveryLocations:string[] };
+export type ChatMessage = { id:number; content:string; type:'text'|'item_card'|'errand_card'; item:ItemCardSnapshot|null; errand:ErrandCardSnapshot|null; createdAt:string; mine:boolean; sender:{nickname:string;avatarUrl:string} };
 
 export type AdminStats = { users:number; items:number; reports:number; reportsPending:number; schools:number };
-export type AdminUser = { id:number; email:string; nickname:string; avatarUrl:string; role:'user'|'admin'; verified:boolean; emailVerified:boolean; adminVerified:boolean; selfOperated:boolean; campusVerified:boolean; isSchoolManager:boolean; isCampusManager:boolean; isSuperAdmin:boolean; schoolId:string; campusId:string; schoolName:string; campusName:string; emailMessageNotifications:boolean; createdAt:string; lastSeenAt:string|null; itemCount:number };
+export type AdminUser = { id:number; username:string; email:string; nickname:string; avatarUrl:string; role:'user'|'admin'; verified:boolean; emailVerified:boolean; adminVerified:boolean; selfOperated:boolean; campusVerified:boolean; isSchoolManager:boolean; isCampusManager:boolean; isSuperAdmin:boolean; schoolId:string; campusId:string; schoolName:string; campusName:string; emailMessageNotifications:boolean; createdAt:string; lastSeenAt:string|null; itemCount:number };
 export type AdminManager={id:number;email:string;nickname:string};
 export type AdminSchool = { id:string; name:string; active:boolean; emailDomains:string[]; campuses:Array<Campus & {active:boolean;manager?:AdminManager|null}>; manager:AdminManager|null };
 export type AdminContext = { isSuperAdmin:boolean; superAdminEmail:string; managedSchoolIds:string[]; managedCampuses:Array<{schoolId:string;campusId:string}>; schools:AdminSchool[] };
@@ -23,3 +24,15 @@ export type Wallet = { wallet:Record<string,WalletBalance>; entries:WalletEntry[
 export type RewardSettings = { signupEnabled:boolean; signupCampusOnly:boolean; signupBonus:{originium:number;lungmen:number}; publishReward:number; purchaseReward:number };
 export type Order = { id:number; itemId:number|null; itemTitle:string; itemImage:string; buyerId:number; sellerId:number; currency:string; amount:number; status:string; createdAt:string; paidAt:string|null; completedAt:string|null; role:'buyer'|'seller'; counterpart:{nickname:string;avatarUrl:string} };
 export type Achievement = { code:string; name:string; description:string; symbol:string; color:string; value?:number };
+
+export type ErrandSide = 'supply' | 'demand';
+export type Errand = {
+  id:number; userId:number; side:ErrandSide; cargoType:string; title:string; description:string;
+  priceMin:number|null; priceMax:number|null; pickupLocations:string[]; deliveryLocations:string[];
+  transportMethod:string|null; weightLimit:string; transportTime:string;
+  startsAt:string; endsAt:string; schoolId:string; campusId:string; schoolName:string; campusName:string;
+  status:string; createdAt:string; publisher:{id:number;nickname:string;avatarUrl:string};
+};
+export type ErrandLocations = {
+  pickup:string[]; delivery:string[]; cargoTypes:string[]; transportMethods:string[]; sides:string[];
+};

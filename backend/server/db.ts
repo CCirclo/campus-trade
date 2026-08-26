@@ -59,7 +59,8 @@ export async function initDatabase() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     `CREATE TABLE IF NOT EXISTS users (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-      email VARCHAR(160) NOT NULL UNIQUE,
+      username VARCHAR(32) NOT NULL,
+      email VARCHAR(160) NULL UNIQUE,
       password_hash VARCHAR(255) NULL,
       nickname VARCHAR(24) NOT NULL,
       avatar_url VARCHAR(800) NOT NULL DEFAULT '',
@@ -343,11 +344,38 @@ export async function initDatabase() {
       INDEX idx_orders_buyer (buyer_id,status),
       INDEX idx_orders_seller (seller_id,status)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS errands (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      user_id BIGINT UNSIGNED NOT NULL,
+      side VARCHAR(10) NOT NULL,
+      cargo_type VARCHAR(10) NOT NULL,
+      title VARCHAR(80) NOT NULL DEFAULT '',
+      description TEXT NOT NULL,
+      price_min DECIMAL(10,2) NULL,
+      price_max DECIMAL(10,2) NULL,
+      pickup_locations JSON NOT NULL,
+      delivery_locations JSON NOT NULL,
+      transport_method VARCHAR(10) NULL,
+      weight_limit VARCHAR(40) NOT NULL DEFAULT '',
+      transport_time VARCHAR(40) NOT NULL DEFAULT '',
+      starts_at TIMESTAMP NOT NULL,
+      ends_at TIMESTAMP NOT NULL,
+      school_id VARCHAR(40) NOT NULL,
+      campus_id VARCHAR(40) NOT NULL,
+      closed_at TIMESTAMP NULL,
+      completed_at TIMESTAMP NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT fk_errands_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      INDEX idx_errands_scope (school_id, campus_id, ends_at),
+      INDEX idx_errands_user (user_id, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   ];
   for (const statement of statements) await pool.query(statement);
   await initializeSchoolCatalog();
   await migrateCampusColumns();
   await migrateAdminColumns();
+  await migrateUsernames();
   await migrateCampusAdminScopes();
   if(!await columnExists('email_codes','purpose'))await pool.query(`ALTER TABLE email_codes ADD COLUMN purpose VARCHAR(20) NOT NULL DEFAULT 'register' AFTER attempts`);
   if(!await columnExists('items','currency'))await pool.query(`ALTER TABLE items ADD COLUMN currency VARCHAR(20) NOT NULL DEFAULT 'cny' AFTER price`);
@@ -358,6 +386,7 @@ export async function initDatabase() {
   await pool.query(`UPDATE items SET regions=JSON_ARRAY('苏州区','北京区') WHERE regions IS NULL`);
   await migrateLedgerAmount();
   await migrateConversations();
+  await migrateErrandConversations();
   await run('DELETE FROM behavior_events WHERE received_at<DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 90 DAY)');
   await promoteAdminsFromEnv();
   if (process.env.SEED_DEMO_DATA === 'true') await seedDemoData();
@@ -400,6 +429,33 @@ async function migrateAdminColumns(){
   if(!await columnExists('users','self_operated'))await pool.query(`ALTER TABLE users ADD COLUMN self_operated TINYINT(1) NOT NULL DEFAULT 0 AFTER admin_verified`);
 }
 
+async function columnIsNullable(table:string,column:string){const row=await one(`SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?`,[table,column]);return String(row?.IS_NULLABLE).toUpperCase()==='YES';}
+
+export async function generateUsername():Promise<string>{
+  for(let i=0;i<20;i++){
+    const username=String(10000000+Math.floor(Math.random()*90000000));
+    if(!await one('SELECT id FROM users WHERE username=?',[username]))return username;
+  }
+  throw new Error('无法生成唯一用户编号');
+}
+
+async function migrateUsernames(){
+  if(!await columnExists('users','username'))await pool.query('ALTER TABLE users ADD COLUMN username VARCHAR(32) NULL AFTER id');
+  const rows=await all('SELECT id FROM users WHERE username IS NULL OR username=\'\'');
+  if(rows.length){
+    const existing=new Set<string>((await all('SELECT username FROM users WHERE username IS NOT NULL AND username<>\'\'')).map(r=>String(r.username)));
+    for(const row of rows){
+      let username:string;
+      do{username=String(10000000+Math.floor(Math.random()*90000000))}while(existing.has(username));
+      existing.add(username);
+      await run('UPDATE users SET username=? WHERE id=?',[username,Number(row.id)]);
+    }
+  }
+  await pool.query('ALTER TABLE users MODIFY username VARCHAR(32) NOT NULL');
+  if(!await indexExists('users','uniq_users_username'))await pool.query('ALTER TABLE users ADD UNIQUE KEY uniq_users_username (username)');
+  if(!await columnIsNullable('users','email'))await pool.query('ALTER TABLE users MODIFY email VARCHAR(160) NULL');
+}
+
 async function migrateCampusAdminScopes(){
   const migrated=await one(`SELECT setting_key FROM platform_settings WHERE setting_key='campus_admin_scope_migrated_v1'`);
   if(migrated)return;
@@ -435,13 +491,21 @@ async function migrateConversations(){
   if(await indexExists('conversations','uniq_conversation'))await pool.query('ALTER TABLE conversations DROP INDEX uniq_conversation');
 }
 
+async function migrateErrandConversations(){
+  if(await columnExists('conversations','errand_id'))return;
+  await pool.query('ALTER TABLE conversations ADD COLUMN errand_id BIGINT UNSIGNED NULL AFTER item_id');
+  await pool.query('ALTER TABLE conversations MODIFY item_id BIGINT UNSIGNED NULL');
+  await pool.query('ALTER TABLE conversations ADD INDEX idx_conversations_errand (errand_id)');
+  await pool.query('ALTER TABLE conversations ADD CONSTRAINT fk_conversations_errand FOREIGN KEY (errand_id) REFERENCES errands(id) ON DELETE CASCADE');
+}
+
 async function seedDemoData() {
   const existing = await one('SELECT COUNT(*) AS count FROM items');
   if (Number(existing?.count) > 0) return;
   let seller = await one('SELECT id FROM users WHERE email = ?', ['demo-seller@campus.local']);
   if (!seller) {
-    const result = await run(`INSERT INTO users (email,nickname,avatar_url,school_id,campus_id,verified) VALUES (?,?,?,?,?,1)`,
-      ['demo-seller@campus.local','苏园好物铺','https://api.dicebear.com/9.x/notionists/svg?seed=market','ruc','suzhou']);
+    const result = await run(`INSERT INTO users (username,email,nickname,avatar_url,school_id,campus_id,verified) VALUES (?,?,?,?,?,?,1)`,
+      [await generateUsername(), 'demo-seller@campus.local','苏园好物铺','https://api.dicebear.com/9.x/notionists/svg?seed=market','ruc','suzhou']);
     seller = { id: result.insertId } as DbRow;
   }
   const products = [
@@ -459,7 +523,7 @@ export function publicUser(row: Record<string, unknown> | undefined) {
   if (!row) return null;
   const scope=migrateLegacyScope(row.school_id,row.campus_id),names=campusScopeNames(scope.schoolId,scope.campusId);
   return {
-    id:Number(row.id), email:String(row.email || ''), nickname:String(row.nickname), avatarUrl:String(row.avatar_url || ''),
+    id:Number(row.id), username:String(row.username || ''), email:String(row.email || ''), nickname:String(row.nickname), avatarUrl:String(row.avatar_url || ''),
     schoolId:scope.schoolId,campusId:scope.campusId,...names,wechatId:String(row.wechat_id || ''), verified:Boolean(row.verified),
     campusVerified:Boolean(row.admin_verified) || (Boolean(row.email_verified) && schoolForEmail(row.email)?.id===scope.schoolId),
     emailMessageNotifications:Boolean(row.email_message_notifications),

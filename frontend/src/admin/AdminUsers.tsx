@@ -45,7 +45,7 @@ export default function AdminUsers() {
   useEffect(() => { api<AdminContext>('/api/admin/context').then(setContext).catch(() => {}); }, []);
 
   const remove = async (u: AdminUser) => {
-    if (!window.confirm(`确定删除用户「${u.nickname}」（${u.email}）？该用户的商品、评论等数据会一并删除，且无法恢复。`)) return;
+    if (!window.confirm(`确定删除用户「${u.nickname}」（编号 ${u.username}）？该用户的商品、评论等数据会一并删除，且无法恢复。`)) return;
     try { await api(`/api/admin/users/${u.id}`, { method: 'DELETE' }); setEditor(null); load(); }
     catch (e) { setError(e instanceof Error ? e.message : '删除失败'); }
   };
@@ -53,7 +53,7 @@ export default function AdminUsers() {
   return <div className="admin-page">
     <div className="admin-page-title admin-title-row"><div><span className="eyebrow">USERS</span><h1>用户管理</h1><p>{campusId ? '当前筛选单个校区' : '默认显示全部可管理校区'} · 共 {total} 位用户。</p></div><button className="button primary" onClick={() => setEditor({ mode: 'create' })}><Plus />创建用户</button></div>
     <div className="admin-toolbar">
-      <form className="admin-search" onSubmit={e => { e.preventDefault(); setPage(1); setKeyword(q); }}><Search /><input value={q} onChange={e => setQ(e.target.value)} placeholder="搜索邮箱或昵称" /><button>搜索</button></form>
+      <form className="admin-search" onSubmit={e => { e.preventDefault(); setPage(1); setKeyword(q); }}><Search /><input value={q} onChange={e => setQ(e.target.value)} placeholder="搜索编号/邮箱/昵称" /><button>搜索</button></form>
       <div className="admin-filters">
         <button className={!role ? 'active' : ''} onClick={() => { setRole(''); setPage(1); }}>全部</button>
         <button className={role === 'user' ? 'active' : ''} onClick={() => { setRole('user'); setPage(1); }}>普通用户</button>
@@ -70,7 +70,7 @@ export default function AdminUsers() {
           {loading ? <tr><td colSpan={6} className="admin-table-empty">加载中…</td></tr> :
             !users.length ? <tr><td colSpan={6} className="admin-table-empty">没有找到符合条件的用户</td></tr> :
             users.map(u => <tr key={u.id}>
-              <td><div className="admin-cell-user"><img src={u.avatarUrl || fallbackAvatar} alt="" /><span><b>{u.nickname}</b><small>{u.email}</small><small>{u.schoolName} · {u.campusName}</small></span></div></td>
+              <td><div className="admin-cell-user"><img src={u.avatarUrl || fallbackAvatar} alt="" /><span><b>{u.nickname}</b><small>编号 {u.username}{u.email ? ` · ${u.email}` : ''}</small><small>{u.schoolName}</small></span></div></td>
               <td><span className={`admin-pill ${u.role === 'admin' ? 'admin' : 'user'}`}>{u.isSuperAdmin?'平台总管理员':u.isSchoolManager?'学校负责人':u.role === 'admin' ? '管理员' : '用户'}</span></td>
               <td><span className={`admin-pill ${authBadge(u).cls}`} title={authBadge(u).title}>{authBadge(u).text}</span>{u.selfOperated && <span className="admin-pill self">自营</span>}</td>
               <td>{u.itemCount}</td>
@@ -113,7 +113,7 @@ function UserDetail({ user, onClose }: { user: AdminUser; onClose: () => void })
   return <div className="report-backdrop" onClick={onClose}>
     <div className="report-modal user-detail-modal" onClick={e => e.stopPropagation()}>
       <div className="report-head">
-        <div><b>{user.nickname}</b><small>{user.email} · {user.schoolName} · {user.campusName} · 发布 {user.itemCount} 件</small></div>
+        <div><b>{user.nickname}</b><small>编号 {user.username}{user.email ? ` · ${user.email}` : ''} · {user.schoolName} · 发布 {user.itemCount} 件</small></div>
         <button type="button" onClick={onClose}><X /></button>
       </div>
       {loading ? <p className="admin-table-empty">加载中…</p> : error ? <p className="admin-table-empty">{error}</p> : <div className="user-detail-body">
@@ -166,9 +166,9 @@ function UserEditor({ mode, user, onClose, onSaved, onError }: { mode: 'create' 
     <div className="admin-form-grid">
       {mode === 'create' && <>
         <label>邮箱地址<input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="name@example.com" /></label>
-        <label>初始密码<input type="text" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} placeholder="至少 8 位" /></label>
+        <label>初始密码<input type="text" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} placeholder="至少 8 位" /></label><div className="admin-cert-note ok">✓ 编号将随机自动生成；昵称留空时自动使用编号</div>
       </>}
-      <label>昵称<input value={nickname} onChange={e => setNickname(e.target.value)} required minLength={2} maxLength={24} /></label>
+      <label>昵称（可选）<input value={nickname} onChange={e => setNickname(e.target.value)} maxLength={24} placeholder="留空则使用编号作为昵称" /></label>
       <label>学校<select value={schoolId} onChange={e=>setSchoolId(e.target.value)} required disabled={!isSuper&&Boolean(user)}>{schools.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
       <label>校区<select value={campusId} onChange={e=>setCampusId(e.target.value)} required>{selectedSchool?.campuses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       {isSuper&&<label>角色<select value={role} onChange={e => setRole(e.target.value as 'user' | 'admin')}><option value="user">普通用户</option><option value="admin">管理员</option></select></label>}
