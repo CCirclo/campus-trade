@@ -405,3 +405,24 @@
 | GET | `/api/health` | 健康检查（含数据库连通性） |
 
 响应：`{ "ok": true }`
+
+## 10. 设备推送 Token — `/api/push`
+
+用于 iOS（与后续 Android）在获取 APNs/FCM 设备 token 后上传/注销。token 以 **SHA-256 哈希** 作为主键去重，原值仅服务端内部用于真实远程送达；任何接口都不返回完整 token，也不记录日志。
+
+| 方法 | 路径 | 说明 | 鉴权 |
+| --- | --- | --- | --- |
+| POST | `/api/push/register` | 注册设备 token（64–200 位十六进制） | 登录 |
+| POST | `/api/push/unregister` | 注销本人名下 token | 登录 |
+
+请求体：`{ "token": "<hex>", "platform": "ios" }`（platform 缺省 `ios`）。
+
+新消息推送载荷（真实远程送达为外部验收项）携带会话标识：`{ "aps": { "alert": {...}, "badge": <未读> }, "conversationId": <会话id>, "type": "new_message" }`，客户端据此在前台/后台/冷启动深链到会话。
+
+## 11. Apple App Site Association
+
+| 路径 | 说明 |
+| --- | --- |
+| GET | `/.well-known/apple-app-site-association` |
+
+响应为 `application/json`，`applinks.details[].appID` 形如 `<APPLE_APP_ID_PREFIX 或 TEAMID>.com.ccirclo.ios`，`paths` 覆盖 `/items/*`（商品 Universal Link）。团队 ID 属外部凭据；未配置时返回占位 `TEAMID` 前缀，保证路径可达。

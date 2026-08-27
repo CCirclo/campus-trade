@@ -1,2 +1,7 @@
 .derived-data/
+.derived-data-*/
+DerivedData/
 xcuserdata/
+*.xcuserstate
+*.xcresult
+*.xcarchive
