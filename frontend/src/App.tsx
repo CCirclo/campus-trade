@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } 
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, ChevronsUpDown, CircleUserRound, Coins, Edit3, Heart, Home,
-  ImagePlus, Laptop, LifeBuoy, Lock, LogOut, MapPin, Menu, MessageCircle, Package, Plus, Search,
+  ImagePlus, Laptop, LifeBuoy, Lock, LogOut, MapPin, MessageCircle, Package, Plus, Search,
   Send, ShieldCheck, ShoppingBag, SlidersHorizontal, Sparkles, Upload, UserRound, X,
 } from 'lucide-react';
 import { api, ApiError, post } from './api';
@@ -37,8 +37,7 @@ function Toast({message,onClose}:{message:string;onClose:()=>void}){
 }
 
 function Shell({children}:{children:ReactNode}){
-  const {user,logout,schools,defaultScope,refresh}=useAuth(); const [menu,setMenu]=useState(false),[unread,setUnread]=useState(0),[switchingCampus,setSwitchingCampus]=useState(false),[achievements,setAchievements]=useState<Achievement[]>([]); const location=useLocation();
-  const fallbackSchool=schools.find(s=>s.id===defaultScope?.schoolId),fallbackCampus=fallbackSchool?.campuses.find(c=>c.id===defaultScope?.campusId),scopeName=user?`${user.schoolName} · ${user.campusName}`:`${fallbackSchool?.name||'校园'} · ${fallbackCampus?.name||'校区'}`;
+  const {user,logout,schools,refresh}=useAuth(); const [menu,setMenu]=useState(false),[unread,setUnread]=useState(0),[switchingCampus,setSwitchingCampus]=useState(false),[achievements,setAchievements]=useState<Achievement[]>([]); const location=useLocation();
   const currentSchool=schools.find(s=>s.id===user?.schoolId);
   const switchCampus=async(campusId:string)=>{if(!user||campusId===user.campusId)return;setSwitchingCampus(true);try{await api('/api/me/profile',{method:'PUT',body:JSON.stringify({nickname:user.nickname,wechatId:user.wechatId,campusId,emailMessageNotifications:user.emailMessageNotifications})});await refresh()}catch(error){window.alert(error instanceof Error?error.message:'校区切换失败，请稍后再试')}finally{setSwitchingCampus(false)}};
   useEffect(()=>setMenu(false),[location.pathname]);
@@ -47,15 +46,15 @@ function Shell({children}:{children:ReactNode}){
   const lungmen=achievements.find(a=>a.code==='lungmen')?.value??0,originium=achievements.find(a=>a.code==='originium')?.value??0,topAchievements=achievements.filter(a=>a.value===undefined).slice(0,3);
   return <div className="app-shell">
     <header className="site-header"><div className="header-inner">
-      <Link to="/" className="brand" aria-label="校园闲置首页"><span className="brand-mark">集</span><span><b>校园闲置</b><small>同校好物 · 当面流转</small></span></Link>
+      <div className="brand"><Link to="/" className="brand-mark" aria-label="返回首页">集</Link><span><b>校园闲置</b><small>同校好物 · 当面流转</small></span></div>
       <nav className="desktop-nav" aria-label="主要导航">
-        <NavLink to="/" end><Home/>首页</NavLink><NavLink to="/publish"><Plus/>发布</NavLink><NavLink to="/errands"><Package/>代取</NavLink><NavLink to="/messages"><span className="nav-icon-badge"><MessageCircle/>{unread>0&&<i>{unread>99?'99+':unread}</i>}</span>消息</NavLink><NavLink to="/feedback"><LifeBuoy/>反馈</NavLink><NavLink to="/mine"><CircleUserRound/>我的</NavLink>
+        <NavLink to="/publish"><Plus/>发布</NavLink><NavLink to="/errands"><Package/>代取</NavLink><NavLink to="/messages"><span className="nav-icon-badge"><MessageCircle/>{unread>0&&<i>{unread>99?'99+':unread}</i>}</span>消息</NavLink>
       </nav>
-      <div className="header-actions">{user&&currentSchool?.campuses.length?<div className="campus-switcher-stack"><label className={`campus-switcher${switchingCampus?' busy':''}`} title="学校由校园邮箱确定、不可自行修改；校区代表你当前所在/浏览的位置，可随时切换。例如：在中关村校区军训的苏州校区学生，应切换到「中关村校区」。"><MapPin className="campus-pin"/><span className="campus-school">{user.schoolName}<Lock className="campus-lock" aria-hidden="true"/></span><span className="campus-sep">·</span><strong>{user.campusName}</strong><ChevronsUpDown className="switch-cue" aria-hidden="true"/><select value={user.campusId} onChange={e=>void switchCampus(e.target.value)} disabled={switchingCampus} aria-label="切换校区">{currentSchool.campuses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><small className="campus-hint">学校固定 · 校区为当前位置，可切换</small></div>:<span className="school-chip">{scopeName}</span>}{user&&<><Link className="wallet-chip" to="/wallet" title="创世结晶"><i>✨</i>{originium}</Link><Link className="wallet-chip" to="/wallet" title="原石"><i>💎</i>{lungmen}</Link></>}{user?<Link className="user-chip" to="/mine"><img src={avatar(user.avatarUrl)} alt=""/><span>{user.nickname}</span>{topAchievements.map(a=><span key={a.code} className="ach-dot" style={{background:achColors[a.color]?.bg,color:achColors[a.color]?.fg}} title={a.name}>{a.symbol}</span>)}</Link>:<Link className="button primary compact" to="/login">登录</Link>}<button className="icon-button menu-button" onClick={()=>setMenu(v=>!v)} aria-label="打开菜单"><Menu/></button></div>
-    </div>{menu&&<div className="mobile-menu"><Link to="/safety">安全交易指南</Link><Link to="/feedback"><LifeBuoy size={17}/>问题反馈与建议</Link>{user&&<button onClick={()=>void logout()}><LogOut size={17}/>退出登录</button>}</div>}</header>
+      <div className="header-actions">{user?<button className="avatar-trigger" onClick={()=>setMenu(v=>!v)} aria-label="打开个人菜单" aria-expanded={menu}><img src={avatar(user.avatarUrl)} alt=""/>{unread>0&&<i aria-label={`${unread} 条未读消息`}>{unread>99?'99+':unread}</i>}</button>:<Link className="button primary compact" to="/login">登录</Link>}</div>
+    </div>{menu&&user&&<div className="account-menu"><div className="account-summary"><img src={avatar(user.avatarUrl)} alt=""/><span><b>{user.nickname}</b><small>{user.schoolName} · {user.campusName}</small></span></div>{currentSchool?.campuses.length&&<label className={`menu-campus${switchingCampus?' busy':''}`}><MapPin/><span><small>当前校区</small><b>{user.campusName}</b></span><ChevronsUpDown/><select value={user.campusId} onChange={e=>void switchCampus(e.target.value)} disabled={switchingCampus} aria-label="切换校区">{currentSchool.campuses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}<Link className="menu-wallet" to="/wallet"><span><i>✨</i><small>创世结晶</small><b>{originium}</b></span><span><i>💎</i><small>原石</small><b>{lungmen}</b></span></Link>{topAchievements.length>0&&<div className="menu-achievements">{topAchievements.map(a=><span key={a.code} style={{background:achColors[a.color]?.bg,color:achColors[a.color]?.fg}} title={a.name}>{a.symbol}<small>{a.name}</small></span>)}</div>}<div className="account-links"><Link to="/mine"><CircleUserRound/>我的</Link><Link to="/feedback"><LifeBuoy/>问题反馈与建议</Link><Link to="/safety"><ShieldCheck/>安全交易指南</Link><button onClick={()=>void logout()}><LogOut/>退出登录</button></div></div>}</header>
     {user&&!user.campusVerified&&<div className="campus-warning"><ShieldCheck/><span><b>你不是校园认证用户，当前只能查看。</b><small>只有通过平台已配置学校邮箱验证的账号才能发布、评论、收藏和发送消息。</small></span></div>}
     <main>{children}</main>
-    <nav className="bottom-nav" aria-label="手机导航"><NavLink to="/" end><Home/><span>首页</span></NavLink><NavLink to="/publish"><Plus/><span>发布</span></NavLink><NavLink to="/errands"><Package/><span>代取</span></NavLink><NavLink to="/messages"><span className="nav-icon-badge"><MessageCircle/>{unread>0&&<i>{unread>99?'99+':unread}</i>}</span><span>消息</span></NavLink><NavLink to="/mine"><CircleUserRound/><span>我的</span></NavLink></nav>
+    <nav className="bottom-nav" aria-label="手机导航"><NavLink to="/" end><Home/><span>首页</span></NavLink><NavLink to="/publish"><Plus/><span>发布</span></NavLink><NavLink to="/errands"><Package/><span>代取</span></NavLink><NavLink to="/messages"><span className="nav-icon-badge"><MessageCircle/>{unread>0&&<i>{unread>99?'99+':unread}</i>}</span><span>消息</span></NavLink></nav>
   </div>
 }
 
