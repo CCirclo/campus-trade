@@ -2,7 +2,7 @@ import SwiftUI
 
 enum Theme {
     static let ink = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? UIColor(red: 0.66, green: 0.88, blue: 0.84, alpha: 1) : UIColor(red: 0.05, green: 0.22, blue: 0.21, alpha: 1) })
-    static let coral = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? UIColor(red: 1, green: 0.48, blue: 0.39, alpha: 1) : UIColor(red: 0.93, green: 0.38, blue: 0.29, alpha: 1) })
+    static let coral = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? UIColor(red: 1, green: 0.48, blue: 0.39, alpha: 1) : UIColor(red: 0.72, green: 0.20, blue: 0.14, alpha: 1) })
     static let paper = Color(uiColor: .systemGroupedBackground)
     static let surface = Color(uiColor: .secondarySystemGroupedBackground)
     static let elevated = Color(uiColor: .tertiarySystemGroupedBackground)

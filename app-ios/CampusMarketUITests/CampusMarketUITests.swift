@@ -123,4 +123,39 @@ final class CampusMarketUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["还在吗"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.textFields["输入消息"].exists)
     }
+
+    // MARK: - 设备矩阵、无障碍与截图
+
+    func testVisualPortraitSnapshot() {
+        XCUIDevice.shared.orientation = .portrait
+        let app = launchApp()
+        XCTAssertTrue(app.staticTexts["二手羽毛球拍"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.tabBars.buttons["我的"].isHittable)
+        keepScreenshot(named: "home-portrait")
+    }
+
+    func testVisualLandscapeSnapshot() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = launchApp()
+        XCTAssertTrue(app.staticTexts["二手羽毛球拍"].waitForExistence(timeout: 15))
+        if !app.buttons["筛选"].isHittable { app.swipeUp() }
+        XCTAssertTrue(app.buttons["筛选"].isHittable)
+        XCTAssertTrue(app.tabBars.buttons["我的"].isHittable)
+        keepScreenshot(named: "home-landscape")
+    }
+
+    func testAccessibilityAudit() throws {
+        XCUIDevice.shared.orientation = .portrait
+        let app = launchApp()
+        XCTAssertTrue(app.staticTexts["二手羽毛球拍"].waitForExistence(timeout: 15))
+        try app.performAccessibilityAudit()
+    }
+
+    private func keepScreenshot(named name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
 }

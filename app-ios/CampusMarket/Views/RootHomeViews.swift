@@ -239,10 +239,10 @@ struct HomeView: View {
 
     private var heroHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(session.scopeTitle, systemImage: "building.columns.fill").font(.caption.bold()).foregroundStyle(Theme.coral)
+            Label(session.scopeTitle, systemImage: "building.columns.fill").font(.caption.bold()).foregroundStyle(Theme.ink)
             Text("让闲置，在校园里\n继续被喜欢。")
                 .font(.system(.largeTitle, design: .rounded, weight: .bold)).foregroundStyle(Theme.ink).minimumScaleFactor(0.82)
-            Text("只看同校真实好物，聊好细节，再当面交易。").font(.subheadline).foregroundStyle(.secondary)
+            Text("只看同校真实好物，聊好细节，再当面交易。").font(.subheadline).foregroundStyle(Theme.ink)
         }
         .frame(maxWidth: .infinity, alignment: .leading).padding(20)
         .background(LinearGradient(colors: [Theme.ink.opacity(0.12), Theme.coral.opacity(0.08), Theme.surface], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
@@ -313,6 +313,8 @@ struct HomeView: View {
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(selected ? Color.white : Theme.ink)
             .padding(.horizontal, 14).padding(.vertical, 9)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Capsule())
             .background(selected ? Theme.coral : Theme.surface, in: Capsule())
             .overlay(Capsule().stroke(Theme.ink.opacity(selected ? 0 : 0.12), lineWidth: 1))
             .buttonStyle(MarketPressStyle())
