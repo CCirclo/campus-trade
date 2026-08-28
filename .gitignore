@@ -8,6 +8,12 @@ uploads/*
 .env
 .env.local
 .env.*.local
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+Secrets.xcconfig
+*.private.xcconfig
 
 # 日志
 npm-debug.log*
@@ -28,6 +34,16 @@ local.properties
 .proxyai/
 *.apk
 *.aab
+
+# Apple / Xcode 本地产物
+DerivedData/
+.derived-data/
+*.xcarchive
+*.xcresult
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.moved-aside
 
 # 本地 AI 辅助开发审计记录
 .codex-copilot-history/

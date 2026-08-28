@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.com.ccirclo.ios",
+        "paths": ["/items/*", "/campus-trade/items/*"]
+      }
+    ]
+  }
+}

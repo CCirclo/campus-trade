@@ -133,6 +133,16 @@ export async function initDatabase() {
       INDEX idx_scope_app_scope_status (requested_school_id,requested_campus_id,status,created_at),
       INDEX idx_scope_app_user (user_id,created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS device_tokens (
+      token_hash CHAR(64) NOT NULL PRIMARY KEY,
+      token VARCHAR(200) NOT NULL,
+      user_id BIGINT UNSIGNED NOT NULL,
+      platform VARCHAR(10) NOT NULL DEFAULT 'ios',
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT fk_device_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      INDEX idx_device_tokens_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     `CREATE TABLE IF NOT EXISTS runtime_secrets (
       secret_name VARCHAR(32) NOT NULL PRIMARY KEY,
       secret_value CHAR(64) NOT NULL,
