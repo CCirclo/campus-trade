@@ -54,11 +54,12 @@ struct ItemCard: View {
         VStack(alignment: .leading, spacing: 9) {
             RemoteImage(url: item.images.first, height: 168).clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             Text(item.title).font(.headline).lineLimit(2, reservesSpace: true)
-            Text("\(item.category) · \(item.condition)").font(.caption).foregroundStyle(.secondary)
+            Text("\(item.category) · \(item.condition)")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Text(priceText(item.price)).font(.title3.bold()).foregroundStyle(Theme.coral)
         }.padding(10).background(Theme.surface).clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.separator, lineWidth: 0.5)).shadow(color: .black.opacity(0.045), radius: 10, y: 4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine).accessibilityLabel("\(item.title)，价格 \(item.price) 元，\(item.condition)")
     }
 }
 
