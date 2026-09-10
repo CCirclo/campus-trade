@@ -28,6 +28,8 @@ import {canManageItem,canViewItemInScope} from './market-scope.js';
 import {campusBelongsToSchool,defaultCampusScope,publicSchoolCatalog} from './campus-catalog.js';
 import {adminScopeApplicationRouter,scopeApplicationRouter} from './scope-applications.js';
 import {errandsRouter} from './errands.js';
+import {treeholeRouter} from './treehole.js';
+import {adminTreeholeRouter} from './admin-treehole.js';
 import {deviceTokenRouter,deviceTokensForUser} from './device-tokens.js';
 import {apnsConfigured,messageNotificationPayload,maybeWarnApns,trySendPush} from './push.js';
 
@@ -36,7 +38,7 @@ const asyncRoute=(handler:(req:AuthedRequest,res:Response,next:NextFunction)=>Pr
 
 app.disable('x-powered-by');app.set('trust proxy','loopback');app.use(express.json({limit:'1mb'}));app.use(cookieParser());
 const securityHeaders:RequestHandler=(req,res,next)=>{res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');res.setHeader('X-Frame-Options','DENY');res.setHeader('Cross-Origin-Opener-Policy','same-origin');res.setHeader('Cross-Origin-Resource-Policy','same-origin');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");if(process.env.NODE_ENV==='production')res.setHeader('Strict-Transport-Security','max-age=31536000');if(['POST','PUT','PATCH','DELETE'].includes(req.method)&&!isAllowedOrigin(req.headers.origin,appOrigin))return res.status(403).json({error:'请求来源不受信任'});next()};app.use(securityHeaders);
-app.use(optionalAuth);app.use('/api/auth',authRouter);app.use('/api/scope-applications',scopeApplicationRouter);app.use('/api/admin/scope-applications',requireAdmin,adminScopeApplicationRouter);app.use('/api/admin',requireAdmin,adminRouter);app.use('/api/errands',errandsRouter);app.use('/api/push',deviceTokenRouter);
+app.use(optionalAuth);app.use('/api/auth',authRouter);app.use('/api/scope-applications',scopeApplicationRouter);app.use('/api/admin/scope-applications',requireAdmin,adminScopeApplicationRouter);app.use('/api/admin',requireAdmin,adminRouter);app.use('/api/admin/treehole',requireAdmin,adminTreeholeRouter);app.use('/api/treehole',treeholeRouter);app.use('/api/errands',errandsRouter);app.use('/api/push',deviceTokenRouter);
 
 // Apple App Site Association：供 Associated Domains 校验。正确 content-type 与 appID，
 // 未配置团队 ID（外部凭据）时仍返回空 teamID 结构，保证路径可达且不破坏构建。

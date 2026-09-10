@@ -1,0 +1,202 @@
+/* 树洞社区（Tree Hole）模块样式 —— 移动优先，随 styles.css 设计令牌 */
+
+.th-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.th-count {
+  color: var(--muted, #64748b);
+  font-size: 14px;
+}
+
+.th-list {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+
+.th-card {
+  display: block;
+  background: var(--paper, #fff);
+  border: 1px solid var(--line, #e5e7eb);
+  border-radius: var(--radius, 18px);
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--ink, #1e293b);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.th-card:hover { box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); transform: translateY(-1px); }
+.th-card-image { aspect-ratio: 16 / 9; background: var(--bg, #f1f5f9); }
+.th-card-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.th-card-body { padding: 14px 16px; }
+.th-card-content {
+  margin: 0 0 12px;
+  color: var(--ink, #1e293b);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.th-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.th-card-author { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.th-card-author b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.th-card-author.anon b { color: var(--muted, #64748b); }
+.th-card-author i { font-style: normal; font-size: 11px; background: #eaf2ff; color: #2563eb; border-radius: 6px; padding: 1px 5px; }
+.th-card-counts { display: inline-flex; align-items: center; gap: 10px; color: var(--muted, #64748b); font-size: 12px; }
+.th-card-counts span { display: inline-flex; align-items: center; gap: 3px; }
+.th-card-counts svg { width: 14px; height: 14px; }
+
+/* 头像 */
+.th-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+.th-avatar.sm { width: 28px; height: 28px; }
+.th-avatar.lg { width: 44px; height: 44px; }
+.th-avatar.anon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef2f7;
+  color: #64748b;
+  font-weight: 700;
+  font-size: 15px;
+}
+.th-avatar.anon.sm { font-size: 12px; }
+
+/* 详情 */
+.th-detail {
+  background: var(--paper, #fff);
+  border: 1px solid var(--line, #e5e7eb);
+  border-radius: var(--radius, 18px);
+  padding: 20px;
+  margin-top: 12px;
+}
+.th-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.th-detail-author { display: inline-flex; align-items: center; gap: 10px; }
+.th-detail-author span { display: flex; flex-direction: column; }
+.th-detail-author b { font-weight: 600; }
+.th-detail-author.anon b { color: var(--muted, #64748b); }
+.th-detail-author small { color: var(--muted, #64748b); }
+.th-detail-tools { display: inline-flex; align-items: center; gap: 10px; }
+.th-detail-content { line-height: 1.8; white-space: pre-wrap; word-break: break-word; }
+.th-detail-images { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); margin-top: 14px; }
+.th-detail-images img { width: 100%; border-radius: 12px; object-fit: cover; cursor: zoom-in; }
+.th-detail-actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line, #e5e7eb); }
+.th-detail-actions .liked { color: #e11d48; border-color: #fecdd3; background: #fff1f2; }
+.th-detail-count { display: inline-flex; align-items: center; gap: 5px; color: var(--muted, #64748b); font-size: 14px; }
+.th-detail-count svg { width: 16px; height: 16px; }
+
+/* 评论区 */
+.th-comments { margin-top: 18px; }
+.th-composer { margin-bottom: 16px; }
+.th-anon-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--muted, #64748b);
+}
+.th-anon-toggle button {
+  border: 1px solid var(--line, #e5e7eb);
+  background: var(--paper, #fff);
+  color: var(--ink, #1e293b);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.th-anon-toggle button.active { background: #eaf2ff; border-color: #2563eb; color: #2563eb; font-weight: 600; }
+.th-reply-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #eaf2ff;
+  color: #2563eb;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.th-reply-bar button { border: 0; background: transparent; color: inherit; cursor: pointer; display: inline-flex; }
+
+.th-comment-list { display: flex; flex-direction: column; gap: 14px; }
+.th-comment { display: flex; gap: 10px; }
+.th-comment-body { flex: 1; min-width: 0; }
+.th-comment-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 4px; }
+.th-comment-head b { font-weight: 600; font-size: 14px; }
+.th-comment-head b.anon { color: var(--muted, #64748b); font-weight: 600; }
+.th-comment-head time { color: var(--muted, #64748b); font-size: 12px; }
+.th-op-badge { font-style: normal; font-size: 11px; background: #eaf2ff; color: #2563eb; border-radius: 6px; padding: 1px 5px; }
+.th-reply-tag { font-size: 12px; color: #2563eb; background: #eaf2ff; border-radius: 6px; padding: 1px 6px; }
+.th-comment-content { line-height: 1.6; word-break: break-word; }
+.th-comment-actions { display: flex; gap: 12px; margin-top: 6px; }
+.th-comment-actions button { border: 0; background: transparent; color: var(--muted, #64748b); font-size: 12px; cursor: pointer; padding: 0; }
+.th-comment-actions button.danger { color: #dc2626; }
+.th-replies {
+  margin-top: 12px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 发布页 */
+.th-scope-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted, #64748b);
+}
+.th-privacy-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 16px;
+}
+.th-privacy-note svg { flex: none; width: 18px; height: 18px; }
+.th-privacy-note b { display: block; }
+.th-privacy-note small { color: #9a3412; }
+
+@media (min-width: 700px) {
+  .th-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .th-detail-images { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1050px) {
+  .th-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* 管理后台辅助样式（与 AdminTreehole 页共用） */
+.admin-page-sub { color: var(--muted, #64748b); font-size: 13px; margin: 4px 0 12px; }
+.admin-th-images { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.admin-th-images img { width: 84px; height: 84px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line, #e5e7eb); }
+.admin-report-detail.muted { color: var(--muted, #64748b); }
+.button.primary.danger { background: #dc2626; border-color: #dc2626; color: #fff; }

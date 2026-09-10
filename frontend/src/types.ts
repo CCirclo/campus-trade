@@ -36,3 +36,27 @@ export type Errand = {
 export type ErrandLocations = {
   pickup:string[]; delivery:string[]; cargoTypes:string[]; transportMethods:string[]; sides:string[];
 };
+
+export type TreeholeAuthor = { anonymous:boolean; alias?:string; id?:number; nickname?:string; avatarUrl?:string; isOP:boolean };
+export type TreeholePost = {
+  id:number; anonymous:boolean; content:string; images:string[];
+  likesCount:number; liked:boolean; commentsCount:number;
+  schoolId:string; campusId:string; schoolName:string; campusName:string;
+  status:string; createdAt:string; mine:boolean; author:TreeholeAuthor;
+};
+export type TreeholeComment = {
+  id:number; postId:number; parentId:number|null; content:string; anonymous:boolean;
+  createdAt:string; mine:boolean; author:TreeholeAuthor;
+};
+export type AdminTreeholePost = {
+  id:number; anonymous:boolean; content:string; images:string[]; likesCount:number; commentsCount:number;
+  schoolId:string; campusId:string; schoolName:string; campusName:string; createdAt:string;
+  author:{id:number;nickname:string;email:string;avatarUrl:string};
+};
+export type AdminTreeholeReport = {
+  id:number; targetType:'post'|'comment'; targetId:number; postId:number; targetContent:string;
+  reason:string; detail:string; status:'待处理'|'已处理'|'已驳回';
+  createdAt:string; handledAt:string|null; handlerNickname:string|null;
+  schoolId:string; campusId:string; schoolName:string; campusName:string;
+  reporter:{id:number;nickname:string;email:string};
+};

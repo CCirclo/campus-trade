@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Route, Routes } from 'react-router-dom';
-import { ArrowLeft, Coins, FileCheck2, Flag, LayoutDashboard, LogOut, Package, School, ShieldCheck, TrendingUp, Users } from 'lucide-react';
+import { ArrowLeft, Coins, FileCheck2, Flag, LayoutDashboard, LogOut, Package, School, ShieldCheck, TreePine, TrendingUp, Users } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import type { AdminContext, AdminStats } from '../types';
@@ -11,6 +11,7 @@ import AdminSchools from './AdminSchools';
 import AdminReward from './AdminReward';
 import AdminApplications from './AdminApplications';
 import AdminEconomy from './AdminEconomy';
+import AdminTreehole from './AdminTreehole';
 
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -55,6 +56,7 @@ export default function AdminApp() {
         <NavLink to="/admin/applications"><FileCheck2 />归属申请</NavLink>
         <NavLink to="/admin/items"><Package />商品</NavLink>
         <NavLink to="/admin/reports"><Flag />举报{stats && stats.reportsPending > 0 && <i>{stats.reportsPending}</i>}</NavLink>
+        <NavLink to="/admin/treehole"><TreePine />树洞</NavLink>
         <NavLink to="/admin/reward"><Coins />奖励设置</NavLink>
       </nav>
       <div className="admin-header-actions">
@@ -72,6 +74,7 @@ export default function AdminApp() {
         <Route path="applications" element={<AdminApplications />} />
         <Route path="items" element={<AdminItems />} />
         <Route path="reports" element={<AdminReports />} />
+        <Route path="treehole" element={<AdminTreehole />} />
         <Route path="reward" element={<AdminReward />} />
       </Routes>
     </main>
