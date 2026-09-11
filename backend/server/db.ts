@@ -380,6 +380,66 @@ export async function initDatabase() {
       INDEX idx_errands_scope (school_id, campus_id, ends_at),
       INDEX idx_errands_user (user_id, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS treehole_posts (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      user_id BIGINT UNSIGNED NOT NULL,
+      content TEXT NOT NULL,
+      images JSON NOT NULL,
+      anonymous TINYINT(1) NOT NULL DEFAULT 0,
+      school_id VARCHAR(40) NOT NULL,
+      campus_id VARCHAR(40) NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT '正常',
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT fk_treehole_posts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      INDEX idx_treehole_posts_scope (school_id, campus_id, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS treehole_comments (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      post_id BIGINT UNSIGNED NOT NULL,
+      user_id BIGINT UNSIGNED NOT NULL,
+      parent_id BIGINT UNSIGNED NULL,
+      content VARCHAR(500) NOT NULL,
+      anonymous TINYINT(1) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_treehole_comments_post FOREIGN KEY (post_id) REFERENCES treehole_posts(id) ON DELETE CASCADE,
+      CONSTRAINT fk_treehole_comments_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_treehole_comments_parent FOREIGN KEY (parent_id) REFERENCES treehole_comments(id) ON DELETE SET NULL,
+      INDEX idx_treehole_comments_post (post_id, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS treehole_likes (
+      post_id BIGINT UNSIGNED NOT NULL,
+      user_id BIGINT UNSIGNED NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (post_id, user_id),
+      CONSTRAINT fk_treehole_likes_post FOREIGN KEY (post_id) REFERENCES treehole_posts(id) ON DELETE CASCADE,
+      CONSTRAINT fk_treehole_likes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS treehole_anon_aliases (
+      post_id BIGINT UNSIGNED NOT NULL,
+      user_id BIGINT UNSIGNED NOT NULL,
+      alias_no INT UNSIGNED NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (post_id, user_id),
+      CONSTRAINT fk_treehole_aliases_post FOREIGN KEY (post_id) REFERENCES treehole_posts(id) ON DELETE CASCADE,
+      CONSTRAINT fk_treehole_aliases_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS treehole_reports (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      target_type VARCHAR(10) NOT NULL,
+      target_id BIGINT UNSIGNED NOT NULL,
+      reporter_id BIGINT UNSIGNED NOT NULL,
+      reason VARCHAR(20) NOT NULL,
+      detail VARCHAR(500) NOT NULL DEFAULT '',
+      status VARCHAR(20) NOT NULL DEFAULT '待处理',
+      handled_at TIMESTAMP NULL,
+      handler_id BIGINT UNSIGNED NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_treehole_reports_reporter FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_treehole_reports_handler FOREIGN KEY (handler_id) REFERENCES users(id) ON DELETE SET NULL,
+      INDEX idx_treehole_reports_status (status, created_at),
+      INDEX idx_treehole_reports_target (target_type, target_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   ];
   for (const statement of statements) await pool.query(statement);
   await initializeSchoolCatalog();

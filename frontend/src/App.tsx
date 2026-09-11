@@ -3,7 +3,7 @@ import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, usePa
 import {
   ArrowLeft, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, ChevronsUpDown, CircleUserRound, Coins, Edit3, Heart, Home,
   ImagePlus, Laptop, LifeBuoy, Lock, LogOut, MapPin, MessageCircle, Package, Plus, Search,
-  Send, ShieldCheck, ShoppingBag, SlidersHorizontal, Sparkles, Upload, UserRound, X,
+  Send, ShieldCheck, ShoppingBag, SlidersHorizontal, Sparkles, TreePine, Upload, UserRound, X,
 } from 'lucide-react';
 import { api, ApiError, post } from './api';
 import { useAuth } from './auth';
@@ -15,6 +15,7 @@ import {AvatarCropper} from './AvatarCropper';
 import {analyticsSessionId,itemAttribution,saveAttribution,track,type Attribution} from './analytics';
 import ScopeApplicationForm from './ScopeApplicationForm';
 import {ErrandsPage,ErrandDetailPage,ErrandFormPage,ErrandHelpPage} from './errands';
+import {TreeholePage,TreeholeDetailPage,TreeholeFormPage} from './treehole';
 import './auth-entry.css';
 
 const categories = [
@@ -48,13 +49,13 @@ function Shell({children}:{children:ReactNode}){
     <header className="site-header"><div className="header-inner">
       <div className="brand"><Link to="/" className="brand-mark" aria-label="返回首页">集</Link><span><b>校园闲置</b><small>同校好物 · 当面流转</small></span></div>
       <nav className="desktop-nav" aria-label="主要导航">
-        <NavLink to="/publish"><Plus/>发布</NavLink><NavLink to="/errands"><Package/>代取</NavLink><NavLink to="/messages"><span className="nav-icon-badge"><MessageCircle/>{unread>0&&<i>{unread>99?'99+':unread}</i>}</span>消息</NavLink>
+        <NavLink to="/publish"><Plus/>发布</NavLink><NavLink to="/errands"><Package/>代取</NavLink><NavLink to="/treehole"><TreePine/>树洞</NavLink><NavLink to="/messages"><span className="nav-icon-badge"><MessageCircle/>{unread>0&&<i>{unread>99?'99+':unread}</i>}</span>消息</NavLink>
       </nav>
       <div className="header-actions">{user?<button className="avatar-trigger" onClick={()=>setMenu(v=>!v)} aria-label="打开个人菜单" aria-expanded={menu}><img src={avatar(user.avatarUrl)} alt=""/>{unread>0&&<i aria-label={`${unread} 条未读消息`}>{unread>99?'99+':unread}</i>}</button>:<Link className="button primary compact" to="/login">登录</Link>}</div>
     </div>{menu&&user&&<div className="account-menu"><div className="account-summary"><img src={avatar(user.avatarUrl)} alt=""/><span><b>{user.nickname}</b><small>{user.schoolName} · {user.campusName}</small></span></div>{currentSchool?.campuses.length&&<label className={`menu-campus${switchingCampus?' busy':''}`}><MapPin/><span><small>当前校区</small><b>{user.campusName}</b></span><ChevronsUpDown/><select value={user.campusId} onChange={e=>void switchCampus(e.target.value)} disabled={switchingCampus} aria-label="切换校区">{currentSchool.campuses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}<Link className="menu-wallet" to="/wallet"><span><i>✨</i><small>创世结晶</small><b>{originium}</b></span><span><i>💎</i><small>原石</small><b>{lungmen}</b></span></Link>{topAchievements.length>0&&<div className="menu-achievements">{topAchievements.map(a=><span key={a.code} style={{background:achColors[a.color]?.bg,color:achColors[a.color]?.fg}} title={a.name}>{a.symbol}<small>{a.name}</small></span>)}</div>}<div className="account-links"><Link to="/mine"><CircleUserRound/>我的</Link><Link to="/feedback"><LifeBuoy/>问题反馈与建议</Link><Link to="/safety"><ShieldCheck/>安全交易指南</Link><button onClick={()=>void logout()}><LogOut/>退出登录</button></div></div>}</header>
     {user&&!user.campusVerified&&<div className="campus-warning"><ShieldCheck/><span><b>你不是校园认证用户，当前只能查看。</b><small>只有通过平台已配置学校邮箱验证的账号才能发布、评论、收藏和发送消息。</small></span></div>}
     <main>{children}</main>
-    <nav className="bottom-nav" aria-label="手机导航"><NavLink to="/" end><Home/><span>首页</span></NavLink><NavLink to="/publish"><Plus/><span>发布</span></NavLink><NavLink to="/errands"><Package/><span>代取</span></NavLink><NavLink to="/messages"><span className="nav-icon-badge"><MessageCircle/>{unread>0&&<i>{unread>99?'99+':unread}</i>}</span><span>消息</span></NavLink></nav>
+    <nav className="bottom-nav" aria-label="手机导航"><NavLink to="/" end><Home/><span>首页</span></NavLink><NavLink to="/publish"><Plus/><span>发布</span></NavLink><NavLink to="/errands"><Package/><span>代取</span></NavLink><NavLink to="/treehole"><TreePine/><span>树洞</span></NavLink><NavLink to="/messages"><span className="nav-icon-badge"><MessageCircle/>{unread>0&&<i>{unread>99?'99+':unread}</i>}</span><span>消息</span></NavLink></nav>
   </div>
 }
 
@@ -297,6 +298,7 @@ export default function App(){return <Routes>
     <Route path="/publish" element={<RequireAuth><RequireCampus><PublishPage/></RequireCampus></RequireAuth>}/><Route path="/items/:id/edit" element={<RequireAuth><RequireCampus><PublishPage/></RequireCampus></RequireAuth>}/>
     <Route path="/messages" element={<RequireAuth><MessagesPage/></RequireAuth>}/><Route path="/messages/:id" element={<RequireAuth><ChatPage/></RequireAuth>}/><Route path="/orders" element={<RequireAuth><OrdersPage/></RequireAuth>}/>
     <Route path="/errands" element={<ErrandsPage/>}/><Route path="/errands/new" element={<RequireAuth><RequireCampus><ErrandFormPage/></RequireCampus></RequireAuth>}/><Route path="/errands/help" element={<ErrandHelpPage/>}/><Route path="/errands/:id" element={<ErrandDetailPage/>}/><Route path="/errands/:id/edit" element={<RequireAuth><RequireCampus><ErrandFormPage/></RequireCampus></RequireAuth>}/>
+    <Route path="/treehole" element={<TreeholePage/>}/><Route path="/treehole/new" element={<RequireAuth><RequireCampus><TreeholeFormPage/></RequireCampus></RequireAuth>}/><Route path="/treehole/:id" element={<TreeholeDetailPage/>}/>
     <Route path="/mine" element={<RequireAuth><MinePage/></RequireAuth>}/><Route path="/wallet" element={<RequireAuth><WalletPage/></RequireAuth>}/><Route path="/my-items" element={<RequireAuth><ItemCollection kind="mine"/></RequireAuth>}/><Route path="/favorites" element={<RequireAuth><ItemCollection kind="favorites"/></RequireAuth>}/><Route path="/profile" element={<RequireAuth><ProfilePage/></RequireAuth>}/><Route path="/profile/school-application" element={<RequireAuth><SchoolApplicationPage/></RequireAuth>}/><Route path="/password" element={<RequireAuth><ChangePasswordPage/></RequireAuth>}/><Route path="/feedback" element={<RequireAuth><FeedbackPage/></RequireAuth>}/>
     <Route path="*" element={<Navigate to="/" replace/>}/>
   </Routes></Shell>}/>
